@@ -1,9 +1,10 @@
-from collections import defaultdict
 import queue
 import random
-import numpy as np
+from collections import defaultdict
 
+import numpy as np
 from ray.rllib.policy import Policy
+from ray.rllib.models import  model
 
 from pommerman import constants, utility
 
@@ -13,6 +14,7 @@ class SimplePolicy(Policy):
         # Keep track of recently visited uninteresting positions so that we
         # don't keep visiting the same places.
         super().__init__(observation_space, action_space, config)
+
 
         self._recently_visited_positions = []
         self._recently_visited_length = 6
@@ -67,8 +69,9 @@ class SimplePolicy(Policy):
                 })
             return ret
 
+        print('simple policy obs', obs)
+        print("size: ", obs.shape)
         obs = self.obs_to_dict(obs)
-
         board = np.array(obs['board'])
         my_position = tuple(obs['position'])
         bombs = convert_bombs(np.array(obs['bomb_blast_strength']))
