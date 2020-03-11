@@ -41,10 +41,9 @@ ppo_agent = PPOTrainer(config={
 
 pomme_env = PommeFFA()
 
-checkpoint = 170
-ppo_agent.restore(
-    "/home/nhatminh2947/ray_results/PPO/PPO_PommeFFA_7dddb7f4_0_2020-03-11_23-32-18yp0c0f7b/checkpoint_{}/checkpoint-{}".format(
-        checkpoint, checkpoint))
+checkpoint = 140
+checkpoint_dir = "/home/nhatminh2947/ray_results/PPO/PPO_PommeFFA_fdb733b6_0_2020-03-12_01-16-05_0cof0f0"
+ppo_agent.restore("{}/checkpoint_{}/checkpoint-{}".format(checkpoint_dir, checkpoint, checkpoint))
 
 agents = {}
 for agent_id in range(4):

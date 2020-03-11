@@ -14,25 +14,56 @@ class FirstModel(TFModelV2):
         # self.model = FullyConnectedNetwork(obs_space, action_space,
         #                                    num_outputs, model_config, name)
         # self.register_variables(self.model.variables())
-
         self.inputs = tf.keras.layers.Input(shape=(11, 11, 3), name="inputs_11x11")
+        self.position = tf.keras.layers.Input(shape=(11, 2), name="position")
+        self.ammo = tf.keras.layers.Input(shape=(20,), name="ammo")
+        self.can_kick = tf.keras.layers.Input(shape=(2,), name="can_kick")
+        self.blast_strength = tf.keras.layers.Input(shape=(20,), name="blast_strength")
+        self.teammate = tf.keras.layers.Input(shape=(5,), name="teammate")
+        self.enemies = tf.keras.layers.Input(shape=(5, 3), name="enemies")
+
         self.conv2d_1 = tf.keras.layers.Conv2D(filters=16, kernel_size=(3, 3), input_shape=(11, 11, 3))(self.inputs)
         self.conv2d_2 = tf.keras.layers.Conv2D(filters=32, kernel_size=(3, 3))(self.conv2d_1)
         self.conv2d_3 = tf.keras.layers.Conv2D(filters=64, kernel_size=(3, 3))(self.conv2d_2)
 
-        # self.info = tf.keras.layers.Input(shape=(9,), name="info")
         self.flatten_layer = tf.keras.layers.Flatten()(self.conv2d_3)
+        self.flatten_pos = tf.keras.layers.Flatten()(self.position)
+        self.flatten_ammo = tf.keras.layers.Flatten()(self.ammo)
+        self.flatten_kick = tf.keras.layers.Flatten()(self.can_kick)
+        self.flatten_blast = tf.keras.layers.Flatten()(self.blast_strength)
+        self.flatten_team = tf.keras.layers.Flatten()(self.teammate)
+        self.flatten_enemies = tf.keras.layers.Flatten()(self.enemies)
 
-        self.final_layer = tf.keras.layers.Dense(256, name="final_layer")(self.flatten_layer)
-        self.action_layer = tf.keras.layers.Dense(units=6, name="action")(self.final_layer)
-        self.value_layer = tf.keras.layers.Dense(units=1, name="value_out")(self.final_layer)
-        self.base_model = tf.keras.Model([self.inputs], [self.action_layer, self.value_layer])
+        self.concat = tf.keras.layers.concatenate([self.flatten_layer,
+                                                   self.flatten_pos,
+                                                   self.flatten_ammo,
+                                                   self.flatten_kick,
+                                                   self.flatten_blast,
+                                                   self.flatten_team,
+                                                   self.flatten_enemies])
+
+        self.fc_1 = tf.keras.layers.Dense(512, name="fc_1")(self.concat)
+        self.fc_2 = tf.keras.layers.Dense(256, name="fc_2")(self.fc_1)
+
+        self.action_layer = tf.keras.layers.Dense(units=6, name="action")(self.fc_2)
+        self.value_layer = tf.keras.layers.Dense(units=1, name="value_out")(self.fc_2)
+        self.base_model = tf.keras.Model(
+            [self.inputs, self.position, self.ammo, self.can_kick, self.blast_strength, self.teammate, self.enemies],
+            [self.action_layer, self.value_layer])
+
         self.register_variables(self.base_model.variables)
 
     def forward(self, input_dict, state, seq_lens):
-        model_out, self._value_out = self.base_model(tf.stack(
-            [input_dict["obs"]["board"], input_dict["obs"]["bomb_blast_strength"], input_dict["obs"]["bomb_life"]],
-            axis=-1))
+        obs = input_dict["obs"]
+
+        model_out, self._value_out = self.base_model([
+            tf.stack([obs["board"], obs["bomb_blast_strength"], obs["bomb_life"]], axis=-1),
+            tf.stack(obs["position"], axis=-1),
+            obs["ammo"],
+            obs["can_kick"],
+            obs["blast_strength"],
+            obs["teammate"],
+            tf.stack(obs["enemies"], axis=-1)])
         return model_out, state
 
     def value_function(self):

@@ -11,6 +11,7 @@ from ray.rllib.rollout import rollout
 from ray.rllib.utils import try_import_tf
 from ray.tune.registry import register_env
 
+from pommerman import constants
 from pommerman.agents import BaseAgent, SimpleAgent
 from pommerman.configs import ffa_v0_fast_env
 from pommerman.envs.v0 import Pomme
@@ -28,8 +29,8 @@ DICT_SPACE = spaces.Dict({
     "ammo": spaces.Discrete(20),
     "can_kick": spaces.Discrete(2),
     "blast_strength": spaces.Discrete(20),
-    "teammate": spaces.Discrete(14),
-    "enemies": spaces.Tuple((spaces.Discrete(14), spaces.Discrete(14), spaces.Discrete(14)))
+    "teammate": spaces.Discrete(5),
+    "enemies": spaces.Tuple((spaces.Discrete(5), spaces.Discrete(5), spaces.Discrete(5)))
 })
 
 feature_keys = ["board", "bomb_blast_strength", "bomb_life", "position", "ammo", "can_kick", "blast_strength",
@@ -77,8 +78,8 @@ class PommeFFA(gym.Env):
 
     def featurize(self, obs):
         feature_obs = {key: obs[key] for key in feature_keys}
-        feature_obs['teammate'] = obs['teammate'].value
-        feature_obs['enemies'] = [enemy.value for enemy in obs['enemies']]
+        feature_obs['teammate'] = obs['teammate'].value - constants.Item.AgentDummy.value
+        feature_obs['enemies'] = [enemy.value - constants.Item.AgentDummy.value for enemy in obs['enemies']]
         return feature_obs
 
 
