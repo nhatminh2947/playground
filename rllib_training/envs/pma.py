@@ -21,7 +21,7 @@ tf = try_import_tf()
 agent_names = ["simple_agent_0", "simple_agent_1", "simple_agent_2", "ppo_agent_3"]
 NUM_AGENTS = 4
 
-DICT_SPACE = spaces.Dict({
+DICT_SPACE_FULL = spaces.Dict({
     "board": spaces.Box(low=0, high=13, shape=(11, 11)),
     "bomb_blast_strength": spaces.Box(low=0, high=13, shape=(11, 11)),
     "bomb_life": spaces.Box(low=0, high=13, shape=(11, 11)),
@@ -33,20 +33,33 @@ DICT_SPACE = spaces.Dict({
     "enemies": spaces.Tuple((spaces.Discrete(5), spaces.Discrete(5), spaces.Discrete(5)))
 })
 
+DICT_SPACE_1vs1 = spaces.Dict({
+    "board": spaces.Box(low=0, high=13, shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE)),
+    "bomb_blast_strength": spaces.Box(low=0, high=13, shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE)),
+    "bomb_life": spaces.Box(low=0, high=13, shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE)),
+    "position": spaces.Tuple((spaces.Discrete(constants.BOARD_SIZE_ONE_VS_ONE), spaces.Discrete(constants.BOARD_SIZE_ONE_VS_ONE))),
+    "ammo": spaces.Discrete(constants.NUM_ITEMS_ONE_VS_ONE),
+    "can_kick": spaces.Discrete(2),
+    "blast_strength": spaces.Discrete(constants.NUM_ITEMS_ONE_VS_ONE),
+    "teammate": spaces.Discrete(5),
+    "enemies": spaces.Discrete(5)
+})
+
 feature_keys = ["board", "bomb_blast_strength", "bomb_life", "position", "ammo", "can_kick", "blast_strength",
                 "teammate", "enemies"]
 
 
 class PommeFFA(gym.Env):
-    def __init__(self, config=None):
+    def __init__(self, config=ffa_v0_fast_env()):
         global agent_id
 
-        config = ffa_v0_fast_env()
+        # config = ffa_v0_fast_env()
         env = Pomme(**config["env_kwargs"])
+        num_agents = 2 if config["game_type"] == constants.GameType.OneVsOne else 4
         env.seed(0)
 
         agents = []
-        for agent_id in range(3):
+        for agent_id in range(num_agents - 1):
             agents.append(SimpleAgent(config["agent"](agent_id, config["game_type"])))
 
         agent_id += 1
@@ -57,7 +70,8 @@ class PommeFFA(gym.Env):
         env.set_init_game_state(None)
 
         self.action_space = spaces.Discrete(6)
-        self.observation_space = DICT_SPACE
+        self.observation_space = DICT_SPACE_1vs1 if config["game_type"] == constants.GameType.OneVsOne \
+            else DICT_SPACE_FULL
         self.env = env
 
     def step(self, action):
@@ -79,11 +93,11 @@ class PommeFFA(gym.Env):
     def featurize(self, obs):
         feature_obs = {key: obs[key] for key in feature_keys}
         feature_obs['teammate'] = obs['teammate'].value - constants.Item.AgentDummy.value
-        feature_obs['enemies'] = [enemy.value - constants.Item.AgentDummy.value for enemy in obs['enemies']]
+        feature_obs['enemies'] = obs['enemies'][0].value - constants.Item.AgentDummy.value
         return feature_obs
 
 
-class PommeRllib(MultiAgentEnv):
+class PommeMultiAgent(MultiAgentEnv):
 
     def __init__(self, config, seed=None):
         self.env = Pomme(**config["env_kwargs"])
@@ -97,9 +111,10 @@ class PommeRllib(MultiAgentEnv):
         self.dones = set()
 
         self.action_space = self.env.action_space
-        self.observation_space = DICT_SPACE
+        self.observation_space = DICT_SPACE_FULL
 
     def step(self, action_dict):
+        self.env.render()
         actions = {agent_name: 0 for agent_name in agent_names}
         actions.update(action_dict)
 
@@ -109,8 +124,6 @@ class PommeRllib(MultiAgentEnv):
         obs = {}
         rewards = {}
         infos = {}
-
-        print(_obs)
 
         for id, agent in enumerate(self.env._agents):
             if agent.is_alive:
@@ -125,11 +138,11 @@ class PommeRllib(MultiAgentEnv):
                 rewards[agent_names[id]] = _reward[id]
                 infos[agent_names[id]] = {info_k: info_v for info_k, info_v in _info.items()}
 
-            if id == 3 and not agent.is_alive:
-                for id, agent in enumerate(self.env._agents):
-                    if id not in self.dones:
-                        dones[agent_names[id]] = True
-                dones["__all__"] = True
+            # if id == 3 and not agent.is_alive:
+            #     for id, agent in enumerate(self.env._agents):
+            #         if id not in self.dones:
+            #             dones[agent_names[id]] = True
+            #     dones["__all__"] = True
 
         # print(dones)
 
@@ -137,9 +150,9 @@ class PommeRllib(MultiAgentEnv):
 
     def featurize(self, obs):
         feature_obs = {key: obs[key] for key in feature_keys}
-        feature_obs['teammate'] = obs['teammate'].value
-        feature_obs['enemies'] = [enemy.value for enemy in obs['enemies']]
-        print('featurize obs', feature_obs)
+        feature_obs['teammate'] = obs['teammate'].value - constants.Item.AgentDummy.value
+        feature_obs['enemies'] = [enemy.value - constants.Item.AgentDummy.value for enemy in obs['enemies']]
+
         return feature_obs
 
     def reset(self):
