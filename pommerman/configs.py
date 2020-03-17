@@ -12,9 +12,9 @@ import os
 
 import ruamel.yaml as yaml
 
+from . import characters
 from . import constants
 from . import envs
-from . import characters
 
 
 def one_vs_one_env():
@@ -197,6 +197,44 @@ def team_v0_env():
         'num_rigid': constants.NUM_RIGID,
         'num_wood': constants.NUM_WOOD,
         'num_items': constants.NUM_ITEMS,
+        'max_steps': constants.MAX_STEPS,
+        'render_fps': constants.RENDER_FPS,
+        'env': env_entry_point,
+    }
+    agent = characters.Bomber
+    return locals()
+
+
+def phase_0_team_v0_env():
+    env = envs.v0.Pomme
+    game_type = constants.GameType.Team
+    env_entry_point = 'pommerman.envs.blank_env:Pomme'
+    env_id = 'Phase0-PommeTeam-v0'
+    env_kwargs = {
+        'game_type': game_type,
+        'board_size': constants.BOARD_SIZE,
+        'num_rigid': constants.NUM_RIGID,
+        'num_wood': 0,
+        'num_items': 0,
+        'max_steps': constants.MAX_STEPS,
+        'render_fps': constants.RENDER_FPS,
+        'env': env_entry_point,
+    }
+    agent = characters.Bomber
+    return locals()
+
+
+def minefield_team_v0_env():
+    env = envs.v0.Pomme
+    game_type = constants.GameType.Team
+    env_entry_point = 'pommerman.envs.minefield_env:Pomme'
+    env_id = 'Mines-PommeTeam-v0'
+    env_kwargs = {
+        'game_type': game_type,
+        'board_size': constants.BOARD_SIZE,
+        'num_rigid': constants.NUM_RIGID,
+        'num_wood': 0,
+        'num_items': 0,
         'max_steps': constants.MAX_STEPS,
         'render_fps': constants.RENDER_FPS,
         'env': env_entry_point,

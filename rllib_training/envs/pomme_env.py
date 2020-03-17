@@ -11,6 +11,8 @@ from ray.rllib.rollout import rollout
 from ray.rllib.utils import try_import_tf
 from ray.tune.registry import register_env
 
+import pommerman
+from pommerman import agents
 from pommerman import constants
 from pommerman.agents import BaseAgent, SimpleAgent
 from pommerman.configs import ffa_v0_fast_env
@@ -18,7 +20,6 @@ from pommerman.envs.v0 import Pomme
 
 tf = try_import_tf()
 
-agent_names = ["simple_agent_0", "simple_agent_1", "simple_agent_2", "ppo_agent_3"]
 NUM_AGENTS = 4
 
 DICT_SPACE_FULL = spaces.Dict({
@@ -35,9 +36,11 @@ DICT_SPACE_FULL = spaces.Dict({
 
 DICT_SPACE_1vs1 = spaces.Dict({
     "board": spaces.Box(low=0, high=13, shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE)),
-    "bomb_blast_strength": spaces.Box(low=0, high=13, shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE)),
+    "bomb_blast_strength": spaces.Box(low=0, high=13,
+                                      shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE)),
     "bomb_life": spaces.Box(low=0, high=13, shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE)),
-    "position": spaces.Tuple((spaces.Discrete(constants.BOARD_SIZE_ONE_VS_ONE), spaces.Discrete(constants.BOARD_SIZE_ONE_VS_ONE))),
+    "position": spaces.Tuple(
+        (spaces.Discrete(constants.BOARD_SIZE_ONE_VS_ONE), spaces.Discrete(constants.BOARD_SIZE_ONE_VS_ONE))),
     "ammo": spaces.Discrete(constants.NUM_ITEMS_ONE_VS_ONE),
     "can_kick": spaces.Discrete(2),
     "blast_strength": spaces.Discrete(constants.NUM_ITEMS_ONE_VS_ONE),
@@ -98,53 +101,77 @@ class PommeFFA(gym.Env):
 
 
 class PommeMultiAgent(MultiAgentEnv):
+    def __init__(self, config):
+        self.agent_list = [
+            agents.StaticAgent(),
+            agents.StaticAgent(),
+            agents.StaticAgent(),
+            agents.StaticAgent(),
+        ]
+        self.agent_names = config["agent_names"]
+        self.env = pommerman.make(config["env_id"], self.agent_list)
 
-    def __init__(self, config, seed=None):
-        self.env = Pomme(**config["env_kwargs"])
-        self.env.seed(seed)
-        agents = []
-        for agent_id in range(4):
-            agents.append(BaseAgent(config["agent"](agent_id, config["game_type"])))
-
-        self.env.set_agents(agents)
-        self.env.set_init_game_state(None)
         self.dones = set()
 
         self.action_space = self.env.action_space
         self.observation_space = DICT_SPACE_FULL
 
     def step(self, action_dict):
-        self.env.render()
-        actions = {agent_name: 0 for agent_name in agent_names}
-        actions.update(action_dict)
+        # self.env.render()
+        obs = self.env.get_observations()
+        actions = self.env.act(obs)
 
-        _obs, _reward, _done, _info = self.env.step(list(actions.values()))
+        for agent_name in self.agent_names:
+            if agent_name not in action_dict.keys():
+                action_dict[agent_name] = 0
+
+        actions = [actions[0], action_dict[self.agent_names[0]],
+                   actions[2], action_dict[self.agent_names[1]]]
+
+        _obs, _reward, _done, _info = self.env.step(actions)
 
         dones = {"__all__": _done}
         obs = {}
         rewards = {}
         infos = {}
 
-        for id, agent in enumerate(self.env._agents):
-            if agent.is_alive:
-                dones[agent_names[id]] = False
-                obs[agent_names[id]] = self.featurize(_obs[id])
-                rewards[agent_names[id]] = _reward[id]
-                infos[agent_names[id]] = {info_k: info_v for info_k, info_v in _info.items()}
-            elif not agent.is_alive and id not in self.dones:
-                self.dones.add(id)
-                dones[agent_names[id]] = True
-                obs[agent_names[id]] = self.featurize(_obs[id])
-                rewards[agent_names[id]] = _reward[id]
-                infos[agent_names[id]] = {info_k: info_v for info_k, info_v in _info.items()}
+        if self.env._agents[1].is_alive:
+            dones[self.agent_names[0]] = False
+            obs[self.agent_names[0]] = self.featurize(_obs[1])
 
-            # if id == 3 and not agent.is_alive:
-            #     for id, agent in enumerate(self.env._agents):
-            #         if id not in self.dones:
-            #             dones[agent_names[id]] = True
-            #     dones["__all__"] = True
+            if _done and _info["result"] == constants.Result.Tie:
+                rewards[self.agent_names[0]] = -1
+            elif _done and _info["result"] == constants.Result.Win:
+                rewards[self.agent_names[0]] = 1
+            else:
+                rewards[self.agent_names[0]] = 0
 
-        # print(dones)
+            infos[self.agent_names[0]] = {info_k: info_v for info_k, info_v in _info.items()}
+        elif 1 not in self.dones:
+            self.dones.add(1)
+            dones[self.agent_names[0]] = True
+            obs[self.agent_names[0]] = self.featurize(_obs[1])
+            rewards[self.agent_names[0]] = -1
+            infos[self.agent_names[0]] = {info_k: info_v for info_k, info_v in _info.items()}
+
+        if self.env._agents[3].is_alive:
+            dones[self.agent_names[1]] = False
+            obs[self.agent_names[1]] = self.featurize(_obs[3])
+            
+            if _done and _info["result"] == constants.Result.Tie:
+                rewards[self.agent_names[1]] = -1
+            elif _done and _info["result"] == constants.Result.Win:
+                rewards[self.agent_names[1]] = 1
+            else:
+                rewards[self.agent_names[1]] = 0
+
+            infos[self.agent_names[1]] = {info_k: info_v for info_k, info_v in _info.items()}
+        elif 3 not in self.dones:
+            self.dones.add(3)
+            dones[self.agent_names[1]] = True
+            obs[self.agent_names[1]] = self.featurize(_obs[3])
+            rewards[self.agent_names[1]] = -1
+            infos[self.agent_names[1]] = {info_k: info_v for info_k, info_v in _info.items()}
 
         return obs, rewards, dones, infos
 
@@ -155,10 +182,37 @@ class PommeMultiAgent(MultiAgentEnv):
 
         return feature_obs
 
+    def set_phase(self, phase):
+        if phase == 1:
+            print("Phase 1")
+            self.agent_list = [
+                agents.StaticAgent(),
+                agents.StaticAgent(),
+                agents.StaticAgent(),
+                agents.StaticAgent(),
+            ]
+
+            self.env = pommerman.make("PommeTeam-v0", self.agent_list)
+            self.env.reset()
+
+        elif phase == 2:
+            print("Phase 2")
+            self.agent_list = [
+                agents.SmartRandomAgentNoBomb(),
+                agents.StaticAgent(),
+                agents.SmartRandomAgentNoBomb(),
+                agents.StaticAgent(),
+            ]
+
+            self.env = pommerman.make("PommeTeam-v0", self.agent_list)
+            self.env.reset()
+
     def reset(self):
         self.dones.clear()
         obs = self.env.reset()
-        obs = {agent_names[i]: self.featurize(obs[i]) for i in range(NUM_AGENTS)}
+
+        obs = {self.agent_names[0]: self.featurize(obs[1]),
+               self.agent_names[1]: self.featurize(obs[3])}
         return obs
 
 

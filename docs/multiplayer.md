@@ -16,16 +16,16 @@ import pommerman
 matches=10 # Amount of matches to play
 
 net = pommerman.network.client.Network("play.pommerman.com:5050") # This is essentially a single player to the server. If you want to have multiple players use one for each player.
-result = {"reward":[], "match_id":[]} # Note: We save match ID so we can view replays later
+last_info = {"reward":[], "match_id":[]} # Note: We save match ID so we can view replays later
 for i in range(matches):
     reward, match_id = pommerman.network.client.match(network=net, room=False, agent=pommerman.agents.SimpleAgent)
     # or pommerman.network.client.match(network=net, room="someroom", agent=pommerman.agents.SimpleAgent)
-    result["reward"].append(reward)
-    result["match_id"].append(match_id)
-print(f"Average reward: {sum(result['reward'])/len(result['reward'])}")
+    last_info["reward"].append(reward)
+    last_info["match_id"].append(match_id)
+print(f"Average reward: {sum(last_info['reward'])/len(last_info['reward'])}")
 print("The match IDs of played matches:")
 for i in range(matches):
-    print(f"{i+1}. {result['match_id'][i]}")
+    print(f"{i+1}. {last_info['match_id'][i]}")
 ```
 #### Output
 ![Client API](./assets/ion_client_py.png)

@@ -16,14 +16,14 @@ class FirstModel(TFModelV2):
         # self.model = FullyConnectedNetwork(obs_space, action_space,
         #                                    num_outputs, model_config, name)
         # self.register_variables(self.model.variables())
-        self.inputs = tf.keras.layers.Input(shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE, 3),
+        self.inputs = tf.keras.layers.Input(shape=(constants.BOARD_SIZE, constants.BOARD_SIZE, 3),
                                             name="inputs_11x11")
-        self.position = tf.keras.layers.Input(shape=(constants.BOARD_SIZE_ONE_VS_ONE, 2), name="position")
-        self.ammo = tf.keras.layers.Input(shape=(constants.NUM_ITEMS_ONE_VS_ONE,), name="ammo")
+        self.position = tf.keras.layers.Input(shape=(constants.BOARD_SIZE, 2), name="position")
+        self.ammo = tf.keras.layers.Input(shape=(constants.NUM_ITEMS,), name="ammo")
         self.can_kick = tf.keras.layers.Input(shape=(2,), name="can_kick")
-        self.blast_strength = tf.keras.layers.Input(shape=(constants.NUM_ITEMS_ONE_VS_ONE,), name="blast_strength")
+        self.blast_strength = tf.keras.layers.Input(shape=(constants.NUM_ITEMS,), name="blast_strength")
         self.teammate = tf.keras.layers.Input(shape=(5,), name="teammate")
-        self.enemies = tf.keras.layers.Input(shape=(5, ), name="enemies")
+        self.enemies = tf.keras.layers.Input(shape=(3, 5), name="enemies")
 
         self.conv2d_1 = tf.keras.layers.Conv2D(filters=16, kernel_size=(3, 3))(self.inputs)
         self.conv2d_2 = tf.keras.layers.Conv2D(filters=32, kernel_size=(3, 3))(self.conv2d_1)
@@ -58,6 +58,7 @@ class FirstModel(TFModelV2):
 
     def forward(self, input_dict, state, seq_lens):
         obs = input_dict["obs"]
+        # print("enemies", obs["enemies"])
         model_out, self._value_out = self.base_model([
             tf.stack([obs["board"], obs["bomb_blast_strength"], obs["bomb_life"]], axis=-1),
             tf.stack(obs["position"], axis=-1),
@@ -65,7 +66,7 @@ class FirstModel(TFModelV2):
             obs["can_kick"],
             obs["blast_strength"],
             obs["teammate"],
-            obs["enemies"]])
+            tf.stack(obs["enemies"], axis=-1)])
         return model_out, state
 
     def value_function(self):
