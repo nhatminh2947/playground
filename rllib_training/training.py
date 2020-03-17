@@ -28,6 +28,8 @@ def on_episode_end(info):
             last_info = episode.last_info_for(agent_name)
             break
     # print(episode.agent_rewards)
+    # print(episode._agent_reward_history["ppo_agent_1"])
+    # print(episode._agent_reward_history["ppo_agent_2"])
     if "win" not in episode.custom_metrics:
         episode.custom_metrics["win"] = 0
     if "loss" not in episode.custom_metrics:
@@ -36,8 +38,9 @@ def on_episode_end(info):
         episode.custom_metrics["tie"] = 0
     # print(last_info)
     if last_info["result"] == constants.Result.Win:
-        if last_info['winners'] == [1, 3]:
-            print("win")
+        if any([last_info['winners'] == [1, 3],
+               last_info['winners'] == [1],
+               last_info['winners'] == [3]]):
             episode.custom_metrics["win"] += 1
         else:
             episode.custom_metrics["loss"] += 1
@@ -51,7 +54,7 @@ def on_train_result(info):
     if "phase" not in result.keys():
         result["phase"] = 0
 
-    if result["phase"] == 0 and result["episode_reward_mean"] >= 2:
+    if (result["phase"] == 0 or result["phase"] == 1) and result["episode_reward_mean"] >= 2:
         print("Next phase")
         result["phase"] += 1
         result["phase"] = min(result["phase"], 2)
@@ -60,7 +63,7 @@ def on_train_result(info):
         trainer.workers.foreach_worker(
             lambda ev: ev.foreach_env(
                 lambda env: env.set_phase(result["phase"])))
-    elif result["phase"] == 1 and result["episode_reward_mean"] >= 1:
+    elif result["phase"] == 2 and result["episode_reward_mean"] >= 1:
         print("Next phase")
         result["phase"] += 1
         result["phase"] = min(result["phase"], 2)
@@ -92,7 +95,8 @@ def training_team():
 
     env_config = {
         "agent_names": agent_names,
-        "env_id": "Phase0-PommeTeam-v0"
+        "env_id": "Mines-PommeTeam-v0",
+        "phase": 0
     }
 
     env = pommerman.make(env_id, [])

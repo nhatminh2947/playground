@@ -209,7 +209,7 @@ def phase_0_team_v0_env():
     env = envs.v0.Pomme
     game_type = constants.GameType.Team
     env_entry_point = 'pommerman.envs.blank_env:Pomme'
-    env_id = 'Phase0-PommeTeam-v0'
+    env_id = 'Blank-PommeTeam-v0'
     env_kwargs = {
         'game_type': game_type,
         'board_size': constants.BOARD_SIZE,

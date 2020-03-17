@@ -22,7 +22,8 @@ agent_names = ["ppo_agent_1", "ppo_agent_2"]
 ppo_agent = PPOTrainer(config={
     "env_config": {
         "agent_names": agent_names,
-        "env_id": "Phase0-PommeTeam-v0"
+        "env_id": "Mines-PommeTeam-v0",
+        "phase": 0
     },
     "num_workers": 1,
     "multiagent": {
@@ -39,8 +40,8 @@ ppo_agent = PPOTrainer(config={
 }, env=pomme_env.PommeMultiAgent)
 
 # fdb733b6
-checkpoint = 20
-checkpoint_dir = "/home/nhatminh2947/ray_results/PPO/PPO_PommeMultiAgent_77266e84_0_2020-03-17_05-16-56l5u2nqv0"
+checkpoint = 840
+checkpoint_dir = "/home/nhatminh2947/ray_results/PPO/PPO_PommeMultiAgent_a6d9aeec_0_2020-03-17_16-09-40yzvisnp_"
 ppo_agent.restore("{}/checkpoint_{}/checkpoint-{}".format(checkpoint_dir, checkpoint, checkpoint))
 
 agents_list = [agents.StaticAgent(),
@@ -48,17 +49,19 @@ agents_list = [agents.StaticAgent(),
                agents.StaticAgent(),
                agents.StaticAgent()]
 
-env = pommerman.make("Phase0-PommeTeam-v0", agents_list)
+env = pommerman.make("Mines-PommeTeam-v0", agents_list)
 
 penv = pomme_env.PommeMultiAgent({
     "agent_names": agent_names,
-    "env_id": "Phase0-PommeTeam-v0"
+    "env_id": "Mines-PommeTeam-v0",
+    "phase": 0
 })
 
 for i in range(1):
     obs = env.reset()
 
     done = False
+    step = 0
     while not done:
         env.render()
         actions = env.act(obs)
@@ -67,10 +70,12 @@ for i in range(1):
         actions[3] = ppo_agent.compute_action(observation=penv.featurize(obs[3]), policy_id="ppo_policy")
 
         obs, reward, done, info = env.step(actions)
+        print("step:", step)
         print("actions:", actions)
         print("reward:", reward)
         print("done:", done)
         print("info:", info)
         print("=========")
+        step += 1
     env.render(close=True)
     # env.close()

@@ -30,6 +30,7 @@ def main():
             env.render()
             actions = env.act(state)
             state, reward, done, info = env.step(actions)
+            print(state)
         print('Episode {} finished'.format(i_episode))
     env.close()
 

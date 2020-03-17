@@ -108,10 +108,14 @@ class PommeMultiAgent(MultiAgentEnv):
             agents.StaticAgent(),
             agents.StaticAgent(),
         ]
+        self._step_count = 0
         self.agent_names = config["agent_names"]
         self.env = pommerman.make(config["env_id"], self.agent_list)
-
+        self.phase = config["phase"]
+        print("Phase", self.phase)
         self.dones = set()
+        self._max_steps = self.env._max_steps
+        self._base_reward = 0.001
 
         self.action_space = self.env.action_space
         self.observation_space = DICT_SPACE_FULL
@@ -135,45 +139,34 @@ class PommeMultiAgent(MultiAgentEnv):
         rewards = {}
         infos = {}
 
-        if self.env._agents[1].is_alive:
-            dones[self.agent_names[0]] = False
-            obs[self.agent_names[0]] = self.featurize(_obs[1])
+        for agent_id, agent_name in zip([1, 3], self.agent_names):
+            if self.env._agents[agent_id].is_alive:
+                dones[agent_name] = False
+                obs[agent_name] = self.featurize(_obs[agent_id])
+                rewards[agent_name] = self._base_reward + self._get_rewards(_done, _info["result"], agent_id)
+                infos[agent_name] = {info_k: info_v for info_k, info_v in _info.items()}
+            elif agent_id not in self.dones:
+                self.dones.add(agent_id)
+                dones[agent_name] = True
+                obs[agent_name] = self.featurize(_obs[agent_id])
+                rewards[agent_name] = -1
+                infos[agent_name] = {info_k: info_v for info_k, info_v in _info.items()}
 
-            if _done and _info["result"] == constants.Result.Tie:
-                rewards[self.agent_names[0]] = -1
-            elif _done and _info["result"] == constants.Result.Win:
-                rewards[self.agent_names[0]] = 1
-            else:
-                rewards[self.agent_names[0]] = 0
-
-            infos[self.agent_names[0]] = {info_k: info_v for info_k, info_v in _info.items()}
-        elif 1 not in self.dones:
-            self.dones.add(1)
-            dones[self.agent_names[0]] = True
-            obs[self.agent_names[0]] = self.featurize(_obs[1])
-            rewards[self.agent_names[0]] = -1
-            infos[self.agent_names[0]] = {info_k: info_v for info_k, info_v in _info.items()}
-
-        if self.env._agents[3].is_alive:
-            dones[self.agent_names[1]] = False
-            obs[self.agent_names[1]] = self.featurize(_obs[3])
-            
-            if _done and _info["result"] == constants.Result.Tie:
-                rewards[self.agent_names[1]] = -1
-            elif _done and _info["result"] == constants.Result.Win:
-                rewards[self.agent_names[1]] = 1
-            else:
-                rewards[self.agent_names[1]] = 0
-
-            infos[self.agent_names[1]] = {info_k: info_v for info_k, info_v in _info.items()}
-        elif 3 not in self.dones:
-            self.dones.add(3)
-            dones[self.agent_names[1]] = True
-            obs[self.agent_names[1]] = self.featurize(_obs[3])
-            rewards[self.agent_names[1]] = -1
-            infos[self.agent_names[1]] = {info_k: info_v for info_k, info_v in _info.items()}
-
+        self._step_count += 1
         return obs, rewards, dones, infos
+
+    def _get_rewards(self, done, result, agent_id):
+        if self.phase == 0:
+            if self._step_count >= self._max_steps:
+                return 1 if self.env._agents[agent_id].is_alive else -1
+
+            return 0
+        else:
+            if done and result == constants.Result.Tie:
+                return -1
+            elif done and result == constants.Result.Win:
+                return 1
+            return 0
 
     def featurize(self, obs):
         feature_obs = {key: obs[key] for key in feature_keys}
@@ -191,26 +184,36 @@ class PommeMultiAgent(MultiAgentEnv):
                 agents.StaticAgent(),
                 agents.StaticAgent(),
             ]
-
-            self.env = pommerman.make("PommeTeam-v0", self.agent_list)
+            self.phase = 1
+            self.env = pommerman.make("Blank-PommeTeam-v0", self.agent_list)
             self.env.reset()
-
         elif phase == 2:
             print("Phase 2")
+            self.agent_list = [
+                agents.StaticAgent(),
+                agents.StaticAgent(),
+                agents.StaticAgent(),
+                agents.StaticAgent(),
+            ]
+            self.phase = 1
+            self.env = pommerman.make("PommeTeam-v0", self.agent_list)
+            self.env.reset()
+        elif phase == 3:
+            print("Phase 3")
             self.agent_list = [
                 agents.SmartRandomAgentNoBomb(),
                 agents.StaticAgent(),
                 agents.SmartRandomAgentNoBomb(),
                 agents.StaticAgent(),
             ]
-
+            self.phase = 2
             self.env = pommerman.make("PommeTeam-v0", self.agent_list)
             self.env.reset()
 
     def reset(self):
         self.dones.clear()
         obs = self.env.reset()
-
+        self._step_count = 0
         obs = {self.agent_names[0]: self.featurize(obs[1]),
                self.agent_names[1]: self.featurize(obs[3])}
         return obs
