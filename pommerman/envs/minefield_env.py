@@ -12,16 +12,12 @@ class Pomme(v0.Pomme):
         self.bomb_rate = 0.3
 
     def make_board(self):
-        num_agents = len(self._agents)
-        size = self._board_size
-        self._board = np.ones((size, size)).astype(np.uint8) * constants.Item.Passage.value
+        self._board = utility.make_board(self._board_size, self._num_rigid,
+                                         self._num_wood, len(self._agents))
 
-        assert num_agents == 4
-
-        # self._board[1, 1] = constants.Item.Agent0.value
-        self._board[size - 2, 1] = constants.Item.Agent1.value
-        # self._board[size - 2, size - 2] = constants.Item.Agent2.value
-        self._board[1, size - 2] = constants.Item.Agent3.value
+        self._board[self._board == constants.Item.Wood.value] = constants.Item.Wood.Passage.value
+        self._board[self._board == constants.Item.Agent0.value] = constants.Item.Wood.Passage.value
+        self._board[self._board == constants.Item.Agent2.value] = constants.Item.Wood.Passage.value
 
     def reset(self):
         assert (self._agents is not None)
@@ -70,10 +66,10 @@ class Pomme(v0.Pomme):
 
                 if utility.position_is_passage(self._board, (x, y)):
                     self._board[(x, y)] = constants.Item.Bomb.value
-                    self._bombs.append(characters.Bomb(characters.Bomber(),
-                                                       (x, y),
-                                                       np.random.choice(np.arange(5, 10)) + 1,
-                                                       np.random.choice(np.arange(2, 6))))
+                    self._bombs.append(characters.Bomb(bomber=characters.Bomber(),
+                                                       position=(x, y),
+                                                       life=np.random.choice(np.arange(5, 10)) + 1,
+                                                       blast_strength=np.random.choice(np.arange(2, 6))))
                     break
 
         done = self._get_done()
