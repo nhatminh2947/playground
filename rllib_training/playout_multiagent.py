@@ -7,16 +7,17 @@ import pommerman
 from pommerman import agents
 from pommerman import configs
 from pommerman.envs.v0 import Pomme
+from rllib_training import models
 from rllib_training.envs import pomme_env
-from rllib_training.models.first_model import FirstModel
 
-ray.init()
+ray.init(num_cpus=5, num_gpus=1)
 
 env_config = configs.phase_0_team_v0_env()
 env = Pomme(**env_config['env_kwargs'])
 obs_space = pomme_env.DICT_SPACE_FULL
 act_space = env.action_space
-ModelCatalog.register_custom_model("first_model", FirstModel)
+ModelCatalog.register_custom_model("1st_model", models.FirstModel)
+ModelCatalog.register_custom_model("2nd_model", models.SecondModel)
 agent_names = ["ppo_agent_1", "ppo_agent_2"]
 
 ppo_agent = PPOTrainer(config={
@@ -26,11 +27,12 @@ ppo_agent = PPOTrainer(config={
         "phase": 0
     },
     "num_workers": 1,
+    "num_gpus": 0,
     "multiagent": {
         "policies": {
             "ppo_policy": (PPOTFPolicy, obs_space, act_space, {
                 "model": {
-                    "custom_model": "first_model"
+                    "custom_model": "1st_model"
                 }
             }),
         },
@@ -40,8 +42,8 @@ ppo_agent = PPOTrainer(config={
 }, env=pomme_env.PommeMultiAgent)
 
 # fdb733b6
-checkpoint = 840
-checkpoint_dir = "/home/nhatminh2947/ray_results/PPO/PPO_PommeMultiAgent_a6d9aeec_0_2020-03-17_16-09-40yzvisnp_"
+checkpoint = 2800
+checkpoint_dir = "/home/nhatminh2947/ray_results/1st_model_reward_shaping/PPO_PommeMultiAgent_a5271ad4_0_2020-03-19_05-15-517nopyqnu"
 ppo_agent.restore("{}/checkpoint_{}/checkpoint-{}".format(checkpoint_dir, checkpoint, checkpoint))
 
 agents_list = [agents.StaticAgent(),
@@ -70,6 +72,9 @@ for i in range(1):
         actions[3] = ppo_agent.compute_action(observation=penv.featurize(obs[3]), policy_id="ppo_policy")
 
         obs, reward, done, info = env.step(actions)
+        print(obs[1]["board"])
+        print()
+        print(obs[1]["bomb_life"])
         print("step:", step)
         print("actions:", actions)
         print("reward:", reward)

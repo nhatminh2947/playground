@@ -1,15 +1,7 @@
-import unittest
-
 import gym
-import ray
 from gym import spaces
-from ray.rllib.agents.ppo import DEFAULT_CONFIG, PPOTrainer
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
-from ray.rllib.models import ModelCatalog
-from ray.rllib.models.tf.tf_modelv2 import TFModelV2
-from ray.rllib.rollout import rollout
 from ray.rllib.utils import try_import_tf
-from ray.tune.registry import register_env
 
 import pommerman
 from pommerman import agents
@@ -112,13 +104,16 @@ class PommeMultiAgent(MultiAgentEnv):
         self.agent_names = config["agent_names"]
         self.env = pommerman.make(config["env_id"], self.agent_list)
         self.phase = config["phase"]
-        print("Phase", self.phase)
+
         self.dones = set()
         self._max_steps = self.env._max_steps
         self._base_reward = 0.001
 
         self.action_space = self.env.action_space
         self.observation_space = DICT_SPACE_FULL
+
+    def render(self):
+        self.env.render()
 
     def step(self, action_dict):
         # self.env.render()
@@ -143,7 +138,7 @@ class PommeMultiAgent(MultiAgentEnv):
             if self.env._agents[agent_id].is_alive:
                 dones[agent_name] = False
                 obs[agent_name] = self.featurize(_obs[agent_id])
-                rewards[agent_name] = self._base_reward + self._get_rewards(_done, _info["result"], agent_id)
+                rewards[agent_name] = self._base_reward + self._get_rewards(_done, _info["result"])
                 infos[agent_name] = {info_k: info_v for info_k, info_v in _info.items()}
             elif agent_id not in self.dones:
                 self.dones.add(agent_id)
@@ -155,18 +150,12 @@ class PommeMultiAgent(MultiAgentEnv):
         self._step_count += 1
         return obs, rewards, dones, infos
 
-    def _get_rewards(self, done, result, agent_id):
-        if self.phase == 0:
-            if self._step_count >= self._max_steps:
-                return 1 if self.env._agents[agent_id].is_alive else -1
-
+    def _get_rewards(self, done, result):
+        if done and result == constants.Result.Tie:
             return 0
-        else:
-            if done and result == constants.Result.Tie:
-                return -1
-            elif done and result == constants.Result.Win:
-                return 1
-            return 0
+        elif done and result == constants.Result.Win:
+            return 1
+        return 0
 
     def featurize(self, obs):
         feature_obs = {key: obs[key] for key in feature_keys}
@@ -217,124 +206,3 @@ class PommeMultiAgent(MultiAgentEnv):
         obs = {self.agent_names[0]: self.featurize(obs[1]),
                self.agent_names[1]: self.featurize(obs[3])}
         return obs
-
-
-class CustomModel(TFModelV2):
-    """Example of a custom model that just delegates to a fc-net."""
-
-    def __init__(self, obs_space, action_space, num_outputs, model_config,
-                 name):
-        super(CustomModel, self).__init__(obs_space, action_space, num_outputs,
-                                          model_config, name)
-        print(model_config)
-        print(obs_space.original_space)
-        # self.model = FullyConnectedNetwork(obs_space, action_space,
-        #                                    num_outputs, model_config, name)
-        # self.register_variables(self.model.variables())
-
-        self.inputs = tf.keras.layers.Input(shape=(11, 11, 3), name="observations")
-        self.conv2d_1 = tf.keras.layers.Conv2D(filters=16, kernel_size=(3, 3), input_shape=(11, 11, 3))(self.inputs)
-        self.conv2d_2 = tf.keras.layers.Conv2D(filters=32, kernel_size=(3, 3))(self.conv2d_1)
-        self.conv2d_3 = tf.keras.layers.Conv2D(filters=64, kernel_size=(3, 3))(self.conv2d_2)
-        self.flatten_layer = tf.keras.layers.Flatten()(self.conv2d_3)
-        self.final_layer = tf.keras.layers.Dense(256, name="final_layer")(self.flatten_layer)
-        self.action_layer = tf.keras.layers.Dense(units=6, name="action")(self.final_layer)
-        self.value_layer = tf.keras.layers.Dense(units=1, name="value_out")(self.final_layer)
-        self.base_model = tf.keras.Model(self.inputs, [self.action_layer, self.value_layer])
-        self.register_variables(self.base_model.variables)
-
-    def forward(self, input_dict, state, seq_lens):
-        print("input_dict", input_dict)
-        print("seq_lens", seq_lens)
-        obs = tf.stack(
-            [input_dict["obs"]["board"], input_dict["obs"]["bomb_blast_strength"], input_dict["obs"]["bomb_life"]],
-            axis=-1)
-
-        print(obs)
-        model_out, self._value_out = self.base_model(tf.stack(
-            [input_dict["obs"]["board"], input_dict["obs"]["bomb_blast_strength"], input_dict["obs"]["bomb_life"]],
-            axis=-1))
-        return model_out, state
-
-    def value_function(self):
-        return tf.reshape(self._value_out, [-1])
-
-
-class PommeFFATest(unittest.TestCase):
-    def testEnvironment(self):
-        ModelCatalog.register_custom_model("my_model", CustomModel)
-
-        config = DEFAULT_CONFIG.copy()
-        config['num_workers'] = 0
-        # config['model']['fcnet_hiddens'] = [100, 100]
-        config['env_config'] = ffa_v0_fast_env()
-
-        register_env("PommeFFA", lambda _: PommeFFA())
-        agent = PPOTrainer(env="PommeFFA", config=config)
-        agent.train()
-        path = agent.save()
-        agent.stop()
-
-        # Test train works on restore
-        agent2 = PPOTrainer(env="PommeFFA", config=config)
-        agent2.restore(path)
-        agent2.train()
-
-        # Test rollout works on restore
-        rollout(agent2, "PommeFFA", 100)
-
-
-# class NestedSpacesTest(unittest.TestCase):
-#     def testStep(self):
-#         ModelCatalog.register_custom_model("my_model", CustomModel)
-#
-#         env_config = ffa_competition_env()
-#         env = Pomme(**env_config['env_kwargs'])
-#         obs_space = DICT_SPACE
-#         act_space = env.action_space
-#
-#         env_config["model"] = {
-#             "model": {
-#                 "custom_model": "simple_model"
-#             }
-#         }
-#
-#         config = DEFAULT_CONFIG.copy()
-#         config['num_workers'] = 0
-#         # config['model']['fcnet_hiddens'] = [100, 100]
-#         config['env_config'] = ffa_v0_fast_env()
-#         config['multiagent'] = {
-#             # Map from policy ids to tuples of (policy_cls, obs_space,
-#             # act_space, config). See rollout_worker.py for more info.
-#             "policies": {
-#                 "simple": (SimplePolicy, obs_space, act_space, {"obs_space": obs_space}),
-#                 "ppo_policy": (PPOTFPolicy, obs_space, act_space, {
-#                     "model": {
-#                         "custom_model": "my_model"
-#                     }
-#                 }),
-#             },
-#             # Function mapping agent ids to policy ids.
-#             "policy_mapping_fn": (lambda agent_id: "ppo_policy" if agent_id.startswith('ppo') else "simple"),
-#             # Optional whitelist of policies to train, or None for all policies.
-#             "policies_to_train": ["ppo_policy"],
-#         }
-#
-#         register_env("PommeRllib", lambda _: PommeRllib(env_config))
-#         agent = PPOTrainer(env="PommeRllib", config=config)
-#         agent.train()
-#         path = agent.save()
-#         agent.stop()
-#
-#         # Test train works on restore
-#         agent2 = PPOTrainer(env="PommeRllib", config=config)
-#         agent2.restore(path)
-#         agent2.train()
-#
-#         # Test rollout works on restore
-#         rollout(agent2, "PommeRllib", 100)
-
-
-if __name__ == "__main__":
-    ray.init(num_cpus=5)
-    unittest.main(verbosity=2)

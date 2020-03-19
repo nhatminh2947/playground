@@ -6,13 +6,13 @@ from pommerman import constants
 tf = try_import_tf()
 
 
-class FirstModel(TFModelV2):
+class SecondModel(TFModelV2):
     """Example of a custom model that just delegates to a fc-net."""
 
     def __init__(self, obs_space, action_space, num_outputs, model_config,
                  name):
-        super(FirstModel, self).__init__(obs_space, action_space, num_outputs,
-                                         model_config, name)
+        super(SecondModel, self).__init__(obs_space, action_space, num_outputs,
+                                          model_config, name)
         # self.model = FullyConnectedNetwork(obs_space, action_space,
         #                                    num_outputs, model_config, name)
         # self.register_variables(self.model.variables())
@@ -25,18 +25,15 @@ class FirstModel(TFModelV2):
         self.teammate = tf.keras.layers.Input(shape=(5,), name="teammate")
         self.enemies = tf.keras.layers.Input(shape=(3, 5), name="enemies")
 
-        self.conv2d_1 = tf.keras.layers.Conv2D(filters=32,
+        self.conv2d_1 = tf.keras.layers.Conv2D(filters=16,
                                                kernel_size=(3, 3),
-                                               padding="same",
-                                               activation=tf.keras.activations.relu)(self.inputs)
-        self.conv2d_2 = tf.keras.layers.Conv2D(filters=64,
-                                               kernel_size=(5, 5),
-                                               padding="same",
-                                               activation=tf.keras.activations.relu)(self.conv2d_1)
-        self.conv2d_3 = tf.keras.layers.Conv2D(filters=128,
-                                               kernel_size=(7, 7),
-                                               padding="valid",
-                                               activation=tf.keras.activations.relu)(self.conv2d_2)
+                                               padding="same")(self.inputs)
+        self.conv2d_2 = tf.keras.layers.Conv2D(filters=32,
+                                               kernel_size=(3, 3),
+                                               padding="same")(self.conv2d_1)
+        self.conv2d_3 = tf.keras.layers.Conv2D(filters=64,
+                                               kernel_size=(3, 3),
+                                               padding="same")(self.conv2d_2)
 
         self.flatten_layer = tf.keras.layers.Flatten()(self.conv2d_3)
         self.flatten_pos = tf.keras.layers.Flatten()(self.position)
@@ -54,20 +51,19 @@ class FirstModel(TFModelV2):
                                                    self.flatten_team,
                                                    self.flatten_enemies])
 
-        self.fc_1 = tf.keras.layers.Dense(256, name="fc_1", activation=tf.keras.activations.relu)(self.concat)
-        self.fc_2 = tf.keras.layers.Dense(128, name="fc_2", activation=tf.keras.activations.relu)(self.fc_1)
+        self.fc_1 = tf.keras.layers.Dense(64, name="fc_1")(self.concat)
+        self.fc_2 = tf.keras.layers.Dense(32, name="fc_2")(self.fc_1)
 
         self.action_layer = tf.keras.layers.Dense(units=6,
                                                   name="action",
                                                   activation=tf.keras.activations.softmax)(self.fc_2)
         self.value_layer = tf.keras.layers.Dense(units=1,
-                                                 name="value_out",
-                                                 activation=tf.keras.activations.softmax)(self.fc_2)
+                                                 name="value_out")(self.fc_2)
 
         self.base_model = tf.keras.Model(
             [self.inputs, self.position, self.ammo, self.can_kick, self.blast_strength, self.teammate, self.enemies],
             [self.action_layer, self.value_layer])
-
+        self.base_model.summary()
         self.register_variables(self.base_model.variables)
 
     def forward(self, input_dict, state, seq_lens):

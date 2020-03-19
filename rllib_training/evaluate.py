@@ -6,7 +6,7 @@ from pommerman import configs
 from pommerman.agents.simple_agent import SimpleAgent
 from pommerman.envs.v0 import Pomme
 from rllib_training.envs.pomme_env import PommeFFA
-from rllib_training.models.first_model import FirstModel
+from rllib_training.models import FirstModel
 
 ray.init()
 

@@ -7,9 +7,9 @@ from ray.rllib.utils import try_import_tf
 
 import pommerman
 from pommerman import constants
+from rllib_training import models
 from rllib_training.envs import pomme_env
-from rllib_training.envs.pomme_env import PommeFFA, PommeMultiAgent
-from rllib_training.models.first_model import FirstModel
+from rllib_training.envs.pomme_env import PommeFFA
 
 tf = try_import_tf()
 
@@ -39,8 +39,8 @@ def on_episode_end(info):
     # print(last_info)
     if last_info["result"] == constants.Result.Win:
         if any([last_info['winners'] == [1, 3],
-               last_info['winners'] == [1],
-               last_info['winners'] == [3]]):
+                last_info['winners'] == [1],
+                last_info['winners'] == [3]]):
             episode.custom_metrics["win"] += 1
         else:
             episode.custom_metrics["loss"] += 1
@@ -54,7 +54,16 @@ def on_train_result(info):
     if "phase" not in result.keys():
         result["phase"] = 0
 
-    if (result["phase"] == 0 or result["phase"] == 1) and result["episode_reward_mean"] >= 2:
+    if result["phase"] == 0 and result["episode_len_mean"] >= 400:
+        print("Next phase")
+        result["phase"] += 1
+        result["phase"] = min(result["phase"], 2)
+
+        trainer = info["trainer"]
+        trainer.workers.foreach_worker(
+            lambda ev: ev.foreach_env(
+                lambda env: env.set_phase(result["phase"])))
+    elif result["phase"] == 1 and result["episode_reward_mean"] >= 2:
         print("Next phase")
         result["phase"] += 1
         result["phase"] = min(result["phase"], 2)
@@ -102,7 +111,8 @@ def training_team():
     env = pommerman.make(env_id, [])
     obs_space = pomme_env.DICT_SPACE_FULL
     act_space = env.action_space
-    ModelCatalog.register_custom_model("first_model", FirstModel)
+    ModelCatalog.register_custom_model("1st_model", models.FirstModel)
+    ModelCatalog.register_custom_model("2nd_model", models.SecondModel)
 
     # pbt = PopulationBasedTraining(
     #     time_attr="training_iteration",
@@ -120,8 +130,9 @@ def training_team():
     #     }
     # )
 
-    tune.run(
+    trials = tune.run(
         PPOTrainer,
+        name="1st_model_reward_shaping",
         stop={
             "training_iteration": 10000,
         },
@@ -129,13 +140,13 @@ def training_team():
         checkpoint_at_end=True,
         # scheduler=pbt,
         # num_samples=1,
-        # restore="/home/nhatminh2947/ray_results/PPO/PPO_PommeMultiAgent_19121a0a_2_2020-03-12_04-50-54xeczcy3d/checkpoint_680/checkpoint-680",
         config={
             "batch_mode": "complete_episodes",
-            "env": PommeMultiAgent,
+            "env": "PommeMultiAgent-v0",
             "env_config": env_config,
             "num_workers": 10,
             "num_gpus": 1,
+            "gamma": 0.998,
             "callbacks": {
                 "on_train_result": on_train_result,
                 "on_episode_end": on_episode_end,
@@ -146,7 +157,7 @@ def training_team():
                 "policies": {
                     "ppo_policy": (PPOTFPolicy, obs_space, act_space, {
                         "model": {
-                            "custom_model": "first_model"
+                            "custom_model": "1st_model"
                         }
                     }),
                 },

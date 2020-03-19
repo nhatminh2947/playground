@@ -1,4 +1,5 @@
 import sys
+
 from setuptools import setup, find_packages
 
 CURRENT_PYTHON = sys.version_info[:2]
@@ -36,17 +37,17 @@ setup(name='pommerman',
           'Programming Language :: Python :: 3.6',
       ],
       packages=find_packages(),
-      package_data = {'pommerman' : files },
+      package_data={'pommerman': files},
       install_requires=install_requires,
       extras_require={
-        'extras': extras_require # @TODO this might need refinement
+          'extras': extras_require  # @TODO this might need refinement
       },
       entry_points={
-        'console_scripts': [
-            'pom_battle=pommerman.cli.run_battle:main',
-            'pom_tf_battle=pommerman.cli.train_with_tensorforce:main',
-            'ion_client=pommerman.network.client:init',
-            'ion_server=pommerman.network.server:init'
-        ],
+          'console_scripts': [
+              'pom_battle=pommerman.cli.run_battle:main',
+              'pom_tf_battle=pommerman.cli.train_with_tensorforce:main',
+              'ion_client=pommerman.network.client:init',
+              'ion_server=pommerman.network.server:init'
+          ],
       },
       zip_safe=False)
