@@ -10,8 +10,8 @@ from ray.tune.schedulers import PopulationBasedTraining
 from ray.tune import Trainable
 from pommerman import configs
 from pommerman.envs.v0 import Pomme
-from rllib_training.envs import pma
-from rllib_training.envs.pma import PommeFFA, PommeMultiAgent
+from rllib_training.envs import pomme_env
+from rllib_training.envs.pomme_env import PommeFFA, PommeMultiAgent
 from rllib_training.models.first_model import FirstModel
 
 tf = try_import_tf()
@@ -25,7 +25,7 @@ NUM_AGENTS = 4
 def training_team():
     env_config = configs.team_v0_env()
     env = Pomme(**env_config['env_kwargs'])
-    obs_space = pma.DICT_SPACE
+    obs_space = pomme_env.DICT_SPACE
     act_space = env.action_space
 
     pbt = PopulationBasedTraining(

@@ -3,13 +3,9 @@ import unittest
 import gym
 import ray
 from gym import spaces
-from ray.rllib.agents.ppo import DEFAULT_CONFIG, PPOTrainer
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
-from ray.rllib.models import ModelCatalog
 from ray.rllib.models.tf.tf_modelv2 import TFModelV2
-from ray.rllib.rollout import rollout
 from ray.rllib.utils import try_import_tf
-from ray.tune.registry import register_env
 
 from pommerman import constants
 from pommerman.agents import BaseAgent, SimpleAgent
@@ -35,9 +31,11 @@ DICT_SPACE_FULL = spaces.Dict({
 
 DICT_SPACE_1vs1 = spaces.Dict({
     "board": spaces.Box(low=0, high=13, shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE)),
-    "bomb_blast_strength": spaces.Box(low=0, high=13, shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE)),
+    "bomb_blast_strength": spaces.Box(low=0, high=13,
+                                      shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE)),
     "bomb_life": spaces.Box(low=0, high=13, shape=(constants.BOARD_SIZE_ONE_VS_ONE, constants.BOARD_SIZE_ONE_VS_ONE)),
-    "position": spaces.Tuple((spaces.Discrete(constants.BOARD_SIZE_ONE_VS_ONE), spaces.Discrete(constants.BOARD_SIZE_ONE_VS_ONE))),
+    "position": spaces.Tuple(
+        (spaces.Discrete(constants.BOARD_SIZE_ONE_VS_ONE), spaces.Discrete(constants.BOARD_SIZE_ONE_VS_ONE))),
     "ammo": spaces.Discrete(constants.NUM_ITEMS_ONE_VS_ONE),
     "can_kick": spaces.Discrete(2),
     "blast_strength": spaces.Discrete(constants.NUM_ITEMS_ONE_VS_ONE),
@@ -203,28 +201,28 @@ class CustomModel(TFModelV2):
         return tf.reshape(self._value_out, [-1])
 
 
-class PommeFFATest(unittest.TestCase):
-    def testEnvironment(self):
-        ModelCatalog.register_custom_model("my_model", CustomModel)
-
-        config = DEFAULT_CONFIG.copy()
-        config['num_workers'] = 0
-        # config['model']['fcnet_hiddens'] = [100, 100]
-        config['env_config'] = ffa_v0_fast_env()
-
-        register_env("PommeFFA", lambda _: PommeFFA())
-        agent = PPOTrainer(env="PommeFFA", config=config)
-        agent.train()
-        path = agent.save()
-        agent.stop()
-
-        # Test train works on restore
-        agent2 = PPOTrainer(env="PommeFFA", config=config)
-        agent2.restore(path)
-        agent2.train()
-
-        # Test rollout works on restore
-        rollout(agent2, "PommeFFA", 100)
+# class PommeFFATest(unittest.TestCase):
+#     def testEnvironment(self):
+#         ModelCatalog.register_custom_model("my_model", CustomModel)
+#
+#         config = DEFAULT_CONFIG.copy()
+#         config['num_workers'] = 0
+#         # config['model']['fcnet_hiddens'] = [100, 100]
+#         config['env_config'] = ffa_v0_fast_env()
+#
+#         register_env("PommeFFA", lambda _: PommeFFA())
+#         agent = PPOTrainer(env="PommeFFA", config=config)
+#         agent.train()
+#         path = agent.save()
+#         agent.stop()
+#
+#         # Test train works on restore
+#         agent2 = PPOTrainer(env="PommeFFA", config=config)
+#         agent2.restore(path)
+#         agent2.train()
+#
+#         # Test rollout works on restore
+#         rollout(agent2, "PommeFFA", 100)
 
 
 # class NestedSpacesTest(unittest.TestCase):

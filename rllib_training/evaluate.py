@@ -5,7 +5,7 @@ from ray.rllib.models import ModelCatalog
 from pommerman import configs
 from pommerman.agents.simple_agent import SimpleAgent
 from pommerman.envs.v0 import Pomme
-from rllib_training.envs.pma import PommeFFA
+from rllib_training.envs import PommeFFA
 from rllib_training.models.first_model import FirstModel
 
 # config = ffa_v0_fast_env()
