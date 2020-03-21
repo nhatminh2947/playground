@@ -18,6 +18,7 @@ obs_space = pomme_env.DICT_SPACE_FULL
 act_space = env.action_space
 ModelCatalog.register_custom_model("1st_model", models.FirstModel)
 ModelCatalog.register_custom_model("2nd_model", models.SecondModel)
+ModelCatalog.register_custom_model("3rd_model", models.ThirdModel)
 agent_names = ["ppo_agent_1", "ppo_agent_2"]
 
 ppo_agent = PPOTrainer(config={
@@ -32,7 +33,7 @@ ppo_agent = PPOTrainer(config={
         "policies": {
             "ppo_policy": (PPOTFPolicy, obs_space, act_space, {
                 "model": {
-                    "custom_model": "1st_model"
+                    "custom_model": "3rd_model"
                 }
             }),
         },

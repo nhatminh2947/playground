@@ -1,4 +1,7 @@
+import unittest
+
 import gym
+import numpy as np
 from gym import spaces
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils import try_import_tf
@@ -15,15 +18,8 @@ tf = try_import_tf()
 NUM_AGENTS = 4
 
 DICT_SPACE_FULL = spaces.Dict({
-    "board": spaces.Box(low=0, high=13, shape=(11, 11)),
-    "bomb_blast_strength": spaces.Box(low=0, high=13, shape=(11, 11)),
-    "bomb_life": spaces.Box(low=0, high=13, shape=(11, 11)),
-    "position": spaces.Tuple((spaces.Discrete(11), spaces.Discrete(11))),
-    "ammo": spaces.Discrete(20),
-    "can_kick": spaces.Discrete(2),
-    "blast_strength": spaces.Discrete(20),
-    "teammate": spaces.Discrete(5),
-    "enemies": spaces.Tuple((spaces.Discrete(5), spaces.Discrete(5), spaces.Discrete(5)))
+    "board": spaces.Box(low=0, high=20, shape=(11, 11, 13)),
+    "abilities": spaces.Box(low=0, high=20, shape=(3,))
 })
 
 DICT_SPACE_1vs1 = spaces.Dict({
@@ -158,11 +154,39 @@ class PommeMultiAgent(MultiAgentEnv):
         return 0
 
     def featurize(self, obs):
-        feature_obs = {key: obs[key] for key in feature_keys}
-        feature_obs['teammate'] = obs['teammate'].value - constants.Item.AgentDummy.value
-        feature_obs['enemies'] = [enemy.value - constants.Item.AgentDummy.value for enemy in obs['enemies']]
+        # print(obs)
+        id = 0
+        features = {"board": np.zeros(shape=(13, 11, 11))}
+        # print(features)
+        for item in constants.Item:
+            if item == constants.Item.Bomb or item.value >= constants.Item.AgentDummy.value:
+                continue
+            # print("item:", item)
+            # print("board:", obs["board"])
 
-        return feature_obs
+            features["board"][id][obs["board"] == item.value] = 1
+            id += 1
+        # print(id)
+        features["board"][id] = obs["bomb_life"]
+        id += 1
+
+        features["board"][id] = obs["bomb_blast_strength"]
+        id += 1
+
+        features["board"][id][obs["position"]] = 1
+        id += 1
+
+        features["board"][id][obs["board"] == obs["teammate"].value] = 1
+        id += 1
+
+        for enemy in obs["enemies"]:
+            features["board"][id][obs["board"] == enemy.value] = 1
+        id += 1
+        features["board"] = features["board"].reshape((11, 11, 13))
+        # print("id:", id)
+        features["abilities"] = np.asarray([obs["ammo"], obs["blast_strength"], obs["can_kick"]], dtype=np.float)
+
+        return features
 
     def set_phase(self, phase):
         if phase == 1:
@@ -206,3 +230,23 @@ class PommeMultiAgent(MultiAgentEnv):
         obs = {self.agent_names[0]: self.featurize(obs[1]),
                self.agent_names[1]: self.featurize(obs[3])}
         return obs
+
+
+class TestPommeEnv(unittest.TestCase):
+    def test_featurize_function(self):
+        agents_list = [agents.StaticAgent(),
+                       agents.StaticAgent(),
+                       agents.StaticAgent(),
+                       agents.StaticAgent()]
+
+        env = pommerman.make("Mines-PommeTeam-v0", agents_list)
+
+        obs = env.reset()
+
+        pomme_env = PommeMultiAgent({
+            "agent_names": [],
+            "env_id": "Mines-PommeTeam-v0",
+            "phase": 0
+        })
+
+        print(pomme_env.featurize(obs[0]))

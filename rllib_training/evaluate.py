@@ -6,18 +6,18 @@ from pommerman import configs
 from pommerman.agents.simple_agent import SimpleAgent
 from pommerman.envs.v0 import Pomme
 from rllib_training.envs.pomme_env import PommeFFA
-from rllib_training.models import FirstModel
+from rllib_training.models import FirstModel, ThirdModel
 
 ray.init()
 
-env_config = configs.one_vs_one_env()
+env_config = configs.team_v0_fast_env()
 env = Pomme(**env_config['env_kwargs'])
-ModelCatalog.register_custom_model("first_model", FirstModel)
+ModelCatalog.register_custom_model("third_model", ThirdModel)
 
 ppo_agent = PPOTrainer(config={
-    "env_config": configs.one_vs_one_env(),
+    "env_config": configs.team_v0_fast_env(),
     "num_workers": 1,
-    "model": {"custom_model": "first_model"}
+    "model": {"custom_model": "third_model"}
 }, env=PommeFFA)
 
 pomme_env = PommeFFA()

@@ -9,7 +9,7 @@ import pommerman
 from pommerman import constants
 from rllib_training import models
 from rllib_training.envs import pomme_env
-from rllib_training.envs.pomme_env import PommeFFA
+from rllib_training.envs.pomme_env import PommeFFA, PommeMultiAgent
 
 tf = try_import_tf()
 
@@ -100,19 +100,21 @@ def on_episode_start(info):
 
 
 def training_team():
-    env_id = "PommeTeam-v0"
+    env_id = "Mines-PommeTeam-v0"
 
     env_config = {
         "agent_names": agent_names,
-        "env_id": "Mines-PommeTeam-v0",
+        "env_id": env_id,
         "phase": 0
     }
 
     env = pommerman.make(env_id, [])
     obs_space = pomme_env.DICT_SPACE_FULL
     act_space = env.action_space
+
     ModelCatalog.register_custom_model("1st_model", models.FirstModel)
     ModelCatalog.register_custom_model("2nd_model", models.SecondModel)
+    ModelCatalog.register_custom_model("3rd_model", models.ThirdModel)
 
     # pbt = PopulationBasedTraining(
     #     time_attr="training_iteration",
@@ -132,7 +134,7 @@ def training_team():
 
     trials = tune.run(
         PPOTrainer,
-        name="1st_model_reward_shaping",
+        name="3rd_model_reward_shaping",
         stop={
             "training_iteration": 10000,
         },
@@ -142,7 +144,7 @@ def training_team():
         # num_samples=1,
         config={
             "batch_mode": "complete_episodes",
-            "env": "PommeMultiAgent-v0",
+            "env": PommeMultiAgent,
             "env_config": env_config,
             "num_workers": 10,
             "num_gpus": 1,
@@ -157,7 +159,7 @@ def training_team():
                 "policies": {
                     "ppo_policy": (PPOTFPolicy, obs_space, act_space, {
                         "model": {
-                            "custom_model": "1st_model"
+                            "custom_model": "3rd_model"
                         }
                     }),
                 },
