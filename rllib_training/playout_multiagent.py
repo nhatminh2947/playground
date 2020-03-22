@@ -6,6 +6,7 @@ from ray.rllib.models import ModelCatalog
 import pommerman
 from pommerman import agents
 from pommerman import configs
+from pommerman import constants
 from pommerman.envs.v0 import Pomme
 from rllib_training import models
 from rllib_training.envs import pomme_env
@@ -43,9 +44,9 @@ ppo_agent = PPOTrainer(config={
 }, env=pomme_env.PommeMultiAgent)
 
 # fdb733b6
-checkpoint = 2800
-checkpoint_dir = "/home/nhatminh2947/ray_results/1st_model_reward_shaping/PPO_PommeMultiAgent_a5271ad4_0_2020-03-19_05-15-517nopyqnu"
-ppo_agent.restore("{}/checkpoint_{}/checkpoint-{}".format(checkpoint_dir, checkpoint, checkpoint))
+# checkpoint = 170
+# checkpoint_dir = "/home/nhatminh2947/ray_results/3rd_model_reward_shaping/PPO_PommeMultiAgent_de22a42c_0_2020-03-21_17-53-51j603eedr/"
+# ppo_agent.restore("{}checkpoint_{}/checkpoint-{}".format(checkpoint_dir, checkpoint, checkpoint))
 
 agents_list = [agents.StaticAgent(),
                agents.StaticAgent(),
@@ -73,11 +74,17 @@ for i in range(1):
         actions[3] = ppo_agent.compute_action(observation=penv.featurize(obs[3]), policy_id="ppo_policy")
 
         obs, reward, done, info = env.step(actions)
+        features = penv.featurize(obs[1])
+        for i in range(13):
+            print(features["board"][:, :, i])
+            print("======")
         print(obs[1]["board"])
         print()
         print(obs[1]["bomb_life"])
         print("step:", step)
-        print("actions:", actions)
+        print("alive:", obs[1]["alive"])
+        print("actions:", [constants.Action(action) for action in actions])
+
         print("reward:", reward)
         print("done:", done)
         print("info:", info)

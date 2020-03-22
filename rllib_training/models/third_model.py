@@ -21,9 +21,9 @@ class ThirdModel(TFModelV2):
         self.conv2d_1 = tf.keras.layers.Conv2D(filters=32, padding="same",
                                                kernel_size=(3, 3))(self.board)
         self.conv2d_2 = tf.keras.layers.Conv2D(filters=64, padding="same",
-                                               kernel_size=(5, 5))(self.conv2d_1)
+                                               kernel_size=(3, 3))(self.conv2d_1)
         self.conv2d_3 = tf.keras.layers.Conv2D(filters=128, padding="same",
-                                               kernel_size=(9, 9))(self.conv2d_2)
+                                               kernel_size=(3, 3))(self.conv2d_2)
 
         self.flatten_layer = tf.keras.layers.Flatten()(self.conv2d_3)
 

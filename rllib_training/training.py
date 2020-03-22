@@ -142,6 +142,7 @@ def training_team():
         checkpoint_at_end=True,
         # scheduler=pbt,
         # num_samples=1,
+        restore="/home/nhatminh2947/ray_results/3rd_model_reward_shaping/PPO_PommeMultiAgent_485e78b8_0_2020-03-21_20-05-40fql6k6qf/checkpoint_180/checkpoint-180",
         config={
             "batch_mode": "complete_episodes",
             "env": PommeMultiAgent,

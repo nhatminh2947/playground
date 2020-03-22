@@ -156,33 +156,42 @@ class PommeMultiAgent(MultiAgentEnv):
     def featurize(self, obs):
         # print(obs)
         id = 0
-        features = {"board": np.zeros(shape=(13, 11, 11))}
+        features = {"board": np.zeros(shape=(11, 11, 13))}
         # print(features)
         for item in constants.Item:
-            if item == constants.Item.Bomb or item.value >= constants.Item.AgentDummy.value:
+            if item in [constants.Item.Bomb,
+                        constants.Item.Flames,
+                        constants.Item.Agent0,
+                        constants.Item.Agent1,
+                        constants.Item.Agent2,
+                        constants.Item.Agent3,
+                        constants.Item.AgentDummy]:
                 continue
             # print("item:", item)
             # print("board:", obs["board"])
 
-            features["board"][id][obs["board"] == item.value] = 1
+            features["board"][:, :, id][obs["board"] == item.value] = 1
             id += 1
         # print(id)
-        features["board"][id] = obs["bomb_life"]
+        features["board"][:, :, id] = obs["flame_life"]
         id += 1
 
-        features["board"][id] = obs["bomb_blast_strength"]
+        features["board"][:, :, id] = obs["bomb_life"]
         id += 1
 
-        features["board"][id][obs["position"]] = 1
+        features["board"][:, :, id] = obs["bomb_blast_strength"]
         id += 1
 
-        features["board"][id][obs["board"] == obs["teammate"].value] = 1
+        features["board"][:, :, id][obs["position"]] = 1
+        id += 1
+
+        features["board"][:, :, id][obs["board"] == obs["teammate"].value] = 1
         id += 1
 
         for enemy in obs["enemies"]:
-            features["board"][id][obs["board"] == enemy.value] = 1
+            features["board"][:, :, id][obs["board"] == enemy.value] = 1
         id += 1
-        features["board"] = features["board"].reshape((11, 11, 13))
+
         # print("id:", id)
         features["abilities"] = np.asarray([obs["ammo"], obs["blast_strength"], obs["can_kick"]], dtype=np.float)
 
