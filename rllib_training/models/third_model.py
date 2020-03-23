@@ -19,21 +19,27 @@ class ThirdModel(TFModelV2):
         self.abilities = tf.keras.layers.Input(shape=(3,), name="abilities")
 
         self.conv2d_1 = tf.keras.layers.Conv2D(filters=32, padding="same",
-                                               kernel_size=(3, 3))(self.board)
+                                               kernel_size=(3, 3),
+                                               activation=tf.keras.activations.relu)(self.board)
         self.conv2d_2 = tf.keras.layers.Conv2D(filters=64, padding="same",
-                                               kernel_size=(3, 3))(self.conv2d_1)
+                                               kernel_size=(3, 3),
+                                               activation=tf.keras.activations.relu)(self.conv2d_1)
         self.conv2d_3 = tf.keras.layers.Conv2D(filters=128, padding="same",
-                                               kernel_size=(3, 3))(self.conv2d_2)
+                                               kernel_size=(3, 3),
+                                               activation=tf.keras.activations.relu)(self.conv2d_2)
 
         self.flatten_layer = tf.keras.layers.Flatten()(self.conv2d_3)
 
         self.concat = tf.keras.layers.concatenate([self.flatten_layer,
                                                    self.abilities])
 
-        self.fc_1 = tf.keras.layers.Dense(128, name="fc_1")(self.concat)
-        self.fc_2 = tf.keras.layers.Dense(64, name="fc_2")(self.fc_1)
+        self.fc_1 = tf.keras.layers.Dense(units=128, name="fc_1",
+                                          activation=tf.keras.activations.relu)(self.concat)
+        self.fc_2 = tf.keras.layers.Dense(units=64, name="fc_2",
+                                          activation=tf.keras.activations.relu)(self.fc_1)
 
-        self.action_layer = tf.keras.layers.Dense(units=6, name="action")(self.fc_2)
+        self.action_layer = tf.keras.layers.Dense(units=6, name="action",
+                                                  activation=tf.keras.activations.softmax)(self.fc_2)
         self.value_layer = tf.keras.layers.Dense(units=1, name="value_out")(self.fc_2)
         self.base_model = tf.keras.Model([self.board, self.abilities],
                                          [self.action_layer, self.value_layer])

@@ -44,20 +44,20 @@ ppo_agent = PPOTrainer(config={
 }, env=pomme_env.PommeMultiAgent)
 
 # fdb733b6
-# checkpoint = 170
-# checkpoint_dir = "/home/nhatminh2947/ray_results/3rd_model_reward_shaping/PPO_PommeMultiAgent_de22a42c_0_2020-03-21_17-53-51j603eedr/"
-# ppo_agent.restore("{}checkpoint_{}/checkpoint-{}".format(checkpoint_dir, checkpoint, checkpoint))
+checkpoint = 2950
+checkpoint_dir = "/home/nhatminh2947/ray_results/3rd_model_no_wood_static/PPO_PommeMultiAgent_9d08bc9e_0_2020-03-23_14-57-51nrucciv4"
+ppo_agent.restore("{}/checkpoint_{}/checkpoint-{}".format(checkpoint_dir, checkpoint, checkpoint))
 
 agents_list = [agents.StaticAgent(),
                agents.StaticAgent(),
                agents.StaticAgent(),
                agents.StaticAgent()]
-
-env = pommerman.make("Mines-PommeTeam-v0", agents_list)
+env_id = "PommeTeam-nowood-v0"
+env = pommerman.make(env_id, agents_list)
 
 penv = pomme_env.PommeMultiAgent({
     "agent_names": agent_names,
-    "env_id": "Mines-PommeTeam-v0",
+    "env_id": env_id,
     "phase": 0
 })
 
@@ -76,6 +76,7 @@ for i in range(1):
         obs, reward, done, info = env.step(actions)
         features = penv.featurize(obs[1])
         for i in range(13):
+            print("i:", i)
             print(features["board"][:, :, i])
             print("======")
         print(obs[1]["board"])

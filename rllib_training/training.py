@@ -38,14 +38,11 @@ def on_episode_end(info):
         episode.custom_metrics["tie"] = 0
     # print(last_info)
     if last_info["result"] == constants.Result.Win:
-        if any([last_info['winners'] == [1, 3],
-                last_info['winners'] == [1],
-                last_info['winners'] == [3]]):
-            episode.custom_metrics["win"] += 1
-        else:
-            episode.custom_metrics["loss"] += 1
+        episode.custom_metrics["win"] += 1
     elif last_info["result"] == constants.Result.Tie:
         episode.custom_metrics["tie"] += 1
+    else:
+        episode.custom_metrics["loss"] += 1
 
 
 def on_train_result(info):
@@ -100,7 +97,7 @@ def on_episode_start(info):
 
 
 def training_team():
-    env_id = "Mines-PommeTeam-v0"
+    env_id = "PommeTeam-nowood-v0"
 
     env_config = {
         "agent_names": agent_names,
@@ -134,22 +131,28 @@ def training_team():
 
     trials = tune.run(
         PPOTrainer,
-        name="3rd_model_reward_shaping",
+        name="3rd_model_no_wood_static",
         stop={
-            "training_iteration": 10000,
+            "training_iteration": 10050,
         },
-        checkpoint_freq=10,
+        checkpoint_freq=50,
         checkpoint_at_end=True,
         # scheduler=pbt,
         # num_samples=1,
-        restore="/home/nhatminh2947/ray_results/3rd_model_reward_shaping/PPO_PommeMultiAgent_485e78b8_0_2020-03-21_20-05-40fql6k6qf/checkpoint_180/checkpoint-180",
+        # restore="/home/nhatminh2947/ray_results/3rd_model_no_wood_static/PPO_PommeMultiAgent_9d08bc9e_0_2020-03-23_14-57-51nrucciv4/checkpoint_3500/checkpoint-3500",
         config={
             "batch_mode": "complete_episodes",
             "env": PommeMultiAgent,
             "env_config": env_config,
-            "num_workers": 10,
+            "num_workers": 8,
             "num_gpus": 1,
-            "gamma": 0.998,
+            "train_batch_size": 50000,
+            "sgd_minibatch_size": 5000,
+            "clip_param": 0.2,
+            "lambda": 0.995,
+            "num_sgd_iter": 10,
+            "vf_share_layers": True,
+            "vf_loss_coeff": 1e-3,
             "callbacks": {
                 "on_train_result": on_train_result,
                 "on_episode_end": on_episode_end,
@@ -160,7 +163,8 @@ def training_team():
                 "policies": {
                     "ppo_policy": (PPOTFPolicy, obs_space, act_space, {
                         "model": {
-                            "custom_model": "3rd_model"
+                            "custom_model": "3rd_model",
+                            "use_lstm": True,
                         }
                     }),
                 },

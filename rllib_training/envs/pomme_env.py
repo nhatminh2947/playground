@@ -103,10 +103,11 @@ class PommeMultiAgent(MultiAgentEnv):
 
         self.dones = set()
         self._max_steps = self.env._max_steps
-        self._base_reward = 0.001
+        self._base_reward = 0
 
         self.action_space = self.env.action_space
         self.observation_space = DICT_SPACE_FULL
+        self._agent_ids = [[0, 2], [1, 3]]
 
     def render(self):
         self.env.render()
@@ -120,8 +121,12 @@ class PommeMultiAgent(MultiAgentEnv):
             if agent_name not in action_dict.keys():
                 action_dict[agent_name] = 0
 
-        actions = [actions[0], action_dict[self.agent_names[0]],
-                   actions[2], action_dict[self.agent_names[1]]]
+        if self._position:
+            actions = [actions[0], action_dict[self.agent_names[0]],
+                       actions[2], action_dict[self.agent_names[1]]]
+        else:
+            actions = [action_dict[self.agent_names[0]], actions[1],
+                       action_dict[self.agent_names[1]], actions[3]]
 
         _obs, _reward, _done, _info = self.env.step(actions)
 
@@ -130,21 +135,32 @@ class PommeMultiAgent(MultiAgentEnv):
         rewards = {}
         infos = {}
 
-        for agent_id, agent_name in zip([1, 3], self.agent_names):
+        for agent_id, agent_name in zip(self._agent_ids[self._position], self.agent_names):
             if self.env._agents[agent_id].is_alive:
                 dones[agent_name] = False
                 obs[agent_name] = self.featurize(_obs[agent_id])
                 rewards[agent_name] = self._base_reward + self._get_rewards(_done, _info["result"])
-                infos[agent_name] = {info_k: info_v for info_k, info_v in _info.items()}
+                infos[agent_name] = self._get_infos(_done, _info)
             elif agent_id not in self.dones:
                 self.dones.add(agent_id)
                 dones[agent_name] = True
                 obs[agent_name] = self.featurize(_obs[agent_id])
                 rewards[agent_name] = -1
-                infos[agent_name] = {info_k: info_v for info_k, info_v in _info.items()}
+                infos[agent_name] = self._get_infos(_done, _info)
 
         self._step_count += 1
         return obs, rewards, dones, infos
+
+    def _get_infos(self, done, info):
+        if done:
+            if info["result"] == constants.Result.Win:
+                if info["winners"] == self._agent_ids[self._position]:
+                    return {"result": constants.Result.Win}
+                else:
+                    return {"result": constants.Result.Loss}
+            else:
+                return {"result": constants.Result.Tie}
+        return {"result": constants.Result.Incomplete}
 
     def _get_rewards(self, done, result):
         if done and result == constants.Result.Tie:
@@ -238,6 +254,9 @@ class PommeMultiAgent(MultiAgentEnv):
         self._step_count = 0
         obs = {self.agent_names[0]: self.featurize(obs[1]),
                self.agent_names[1]: self.featurize(obs[3])}
+
+        self._position = np.random.choice([0, 1])
+
         return obs
 
 
