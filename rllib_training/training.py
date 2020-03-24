@@ -2,6 +2,7 @@ import ray
 from ray import tune
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.agents.ppo.ppo_tf_policy import PPOTFPolicy
+from ray.rllib.evaluation.metrics import collect_episodes, summarize_episodes
 from ray.rllib.models import ModelCatalog
 from ray.rllib.utils import try_import_tf
 
@@ -145,6 +146,7 @@ def training_team():
             "env": PommeMultiAgent,
             "env_config": env_config,
             "num_workers": 8,
+            "num_envs_per_worker": 4,
             "num_gpus": 1,
             "train_batch_size": 50000,
             "sgd_minibatch_size": 5000,
@@ -165,12 +167,16 @@ def training_team():
                         "model": {
                             "custom_model": "3rd_model",
                             "use_lstm": True,
+                            "max_seq_len": 10,
                         }
                     }),
                 },
                 "policy_mapping_fn": (lambda agent_id: "ppo_policy"),
                 "policies_to_train": ["ppo_policy"],
             },
+            "custom_eval_function": evaluate,
+            "evaluation_interval": 1,
+            "evaluation_num_episodes": 100,
             "log_level": "WARN",
         }
     )
@@ -195,6 +201,45 @@ def training_ffa(env_conf):
             "log_level": "WARN",
         }
     )
+
+
+def evaluate(trainer, eval_workers):
+    """Example of a custom evaluation function.
+    Arguments:
+        trainer (Trainer): trainer class to evaluate.
+        eval_workers (WorkerSet): evaluation workers.
+    Returns:
+        metrics (dict): evaluation metrics dict.
+    """
+
+    # We configured 2 eval workers in the training config.
+    worker_1, worker_2 = eval_workers.remote_workers()
+
+    # Set different env settings for each worker. Here we use a fixed config,
+    # which also could have been computed in each worker by looking at
+    # env_config.worker_index (printed in SimpleCorridor class above).
+    worker_1.foreach_env.remote(lambda env: env.set_corridor_length(4))
+    worker_2.foreach_env.remote(lambda env: env.set_corridor_length(7))
+
+    for i in range(5):
+        print("Custom evaluation round", i)
+        # Calling .sample() runs exactly one episode per worker due to how the
+        # eval workers are configured.
+        ray.get([w.sample.remote() for w in eval_workers.remote_workers()])
+
+    # Collect the accumulated episodes on the workers, and then summarize the
+    # episode stats into a metrics dict.
+    episodes, _ = collect_episodes(remote_workers=eval_workers.remote_workers(), timeout_seconds=99999)
+    # You can compute metrics from the episodes manually, or use the
+    # convenient `summarize_episodes()` utility:
+    metrics = summarize_episodes(episodes)
+    # Note that the above two statements are the equivalent of:
+    # metrics = collect_metrics(eval_workers.local_worker(),
+    #                           eval_workers.remote_workers())
+
+    # You can also put custom values in the metrics dict.
+    metrics["foo"] = 1
+    return metrics
 
 
 if __name__ == "__main__":

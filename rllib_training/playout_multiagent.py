@@ -28,24 +28,25 @@ ppo_agent = PPOTrainer(config={
         "env_id": "Mines-PommeTeam-v0",
         "phase": 0
     },
-    "num_workers": 1,
+    "num_workers": 0,
     "num_gpus": 0,
     "multiagent": {
         "policies": {
             "ppo_policy": (PPOTFPolicy, obs_space, act_space, {
                 "model": {
-                    "custom_model": "3rd_model"
+                    "custom_model": "3rd_model",
+                    "use_lstm": True,
                 }
             }),
         },
         "policy_mapping_fn": (lambda agent_id: "ppo_policy"),
         "policies_to_train": ["ppo_policy"],
-    }
+    },
 }, env=pomme_env.PommeMultiAgent)
 
 # fdb733b6
-checkpoint = 2950
-checkpoint_dir = "/home/nhatminh2947/ray_results/3rd_model_no_wood_static/PPO_PommeMultiAgent_9d08bc9e_0_2020-03-23_14-57-51nrucciv4"
+checkpoint = 950
+checkpoint_dir = "/home/nhatminh2947/ray_results/3rd_model_no_wood_static/PPO_PommeMultiAgent_283d4406_0_2020-03-24_04-09-09mjgzr90e"
 ppo_agent.restore("{}/checkpoint_{}/checkpoint-{}".format(checkpoint_dir, checkpoint, checkpoint))
 
 agents_list = [agents.StaticAgent(),
