@@ -18,8 +18,7 @@ tf = try_import_tf()
 NUM_AGENTS = 4
 
 DICT_SPACE_FULL = spaces.Dict({
-    "board": spaces.Box(low=0, high=20, shape=(11, 11, 13)),
-    "abilities": spaces.Box(low=0, high=20, shape=(3,))
+    "board": spaces.Box(low=0, high=20, shape=(11, 11, 16))
 })
 
 DICT_SPACE_1vs1 = spaces.Dict({
@@ -172,7 +171,7 @@ class PommeMultiAgent(MultiAgentEnv):
     def featurize(self, obs):
         # print(obs)
         id = 0
-        features = {"board": np.zeros(shape=(11, 11, 13))}
+        features = {"board": np.zeros(shape=(11, 11, 16))}
         # print(features)
         for item in constants.Item:
             if item in [constants.Item.Bomb,
@@ -208,8 +207,17 @@ class PommeMultiAgent(MultiAgentEnv):
             features["board"][:, :, id][obs["board"] == enemy.value] = 1
         id += 1
 
+        features["board"][:, :, id] = np.full(shape=(11, 11), fill_value=obs["ammo"])
+        id += 1
+
+        features["board"][:, :, id] = np.full(shape=(11, 11), fill_value=obs["blast_strength"])
+        id += 1
+
+        features["board"][:, :, id] = np.full(shape=(11, 11), fill_value=(1 if obs["can_kick"] else 0))
+        id += 1
+
         # print("id:", id)
-        features["abilities"] = np.asarray([obs["ammo"], obs["blast_strength"], obs["can_kick"]], dtype=np.float)
+        # features["abilities"] = np.asarray([obs["ammo"], obs["blast_strength"], obs["can_kick"]], dtype=np.float)
 
         return features
 
@@ -267,7 +275,7 @@ class TestPommeEnv(unittest.TestCase):
                        agents.StaticAgent(),
                        agents.StaticAgent()]
 
-        env = pommerman.make("Mines-PommeTeam-v0", agents_list)
+        env = pommerman.make("PommeTeam-nowood-v0", agents_list, game_state_file="015.json")
 
         obs = env.reset()
 
@@ -277,4 +285,10 @@ class TestPommeEnv(unittest.TestCase):
             "phase": 0
         })
 
+        print(obs)
+
         print(pomme_env.featurize(obs[0]))
+        f0 = pomme_env.featurize(obs[0])["board"]
+        for i in range(16):
+            print("i: ",i)
+            print(f0[:, :, i])

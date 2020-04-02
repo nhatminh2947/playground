@@ -14,11 +14,9 @@ class ThirdModel(TFModelV2):
         super(ThirdModel, self).__init__(obs_space, action_space, num_outputs,
                                          model_config, name)
 
-        self.board = tf.keras.layers.Input(shape=(constants.BOARD_SIZE, constants.BOARD_SIZE, 13), name="board")
-        self.abilities = tf.keras.layers.Input(shape=(3,), name="abilities")
+        self.board = tf.keras.layers.Input(shape=(constants.BOARD_SIZE, constants.BOARD_SIZE, 16), name="board")
 
         self.norm_board = tf.keras.layers.BatchNormalization()(self.board)
-        self.norm_abilities = tf.keras.layers.BatchNormalization()(self.abilities)
 
         self.conv2d_1 = tf.keras.layers.Conv2D(filters=32, padding="same",
                                                kernel_size=(3, 3),
@@ -32,11 +30,8 @@ class ThirdModel(TFModelV2):
 
         self.flatten_layer = tf.keras.layers.Flatten()(self.conv2d_3)
 
-        self.concat = tf.keras.layers.concatenate([self.flatten_layer,
-                                                   self.norm_abilities])
-
         self.fc_1 = tf.keras.layers.Dense(units=128, name="fc_1",
-                                          activation=tf.keras.activations.relu)(self.concat)
+                                          activation=tf.keras.activations.relu)(self.flatten_layer)
         self.fc_2 = tf.keras.layers.Dense(units=64, name="fc_2",
                                           activation=tf.keras.activations.relu)(self.fc_1)
 
@@ -44,7 +39,7 @@ class ThirdModel(TFModelV2):
         self.action_layer = tf.keras.layers.Dense(units=6, name="action",
                                                   activation=tf.keras.activations.softmax)(self.fc_2_bn)
         self.value_layer = tf.keras.layers.Dense(units=1, name="value_out")(self.fc_2_bn)
-        self.base_model = tf.keras.Model([self.board, self.abilities],
+        self.base_model = tf.keras.Model(self.board,
                                          [self.action_layer, self.value_layer])
         # self.base_model.summary()
         self.register_variables(self.base_model.variables)
@@ -55,7 +50,7 @@ class ThirdModel(TFModelV2):
         # print(obs)
         # print("board:", obs["board"].shape)
         # print("abilities:", obs["abilities"])
-        model_out, self._value_out = self.base_model([obs["board"], obs["abilities"]])
+        model_out, self._value_out = self.base_model([obs["board"]])
         return model_out, state
 
     def value_function(self):

@@ -97,6 +97,11 @@ def on_episode_start(info):
         episode.custom_metrics[agent_name + "_bomb"] = 0
 
 
+def on_postprocess_traj(info):
+    curiosity_rews = info["pre_batch"][0].model.curiosity_loss
+    info["post_batch"][1]['rewards'] += curiosity_rews
+
+
 def training_team():
     env_id = "PommeTeam-nowood-v0"
 
@@ -113,6 +118,7 @@ def training_team():
     ModelCatalog.register_custom_model("1st_model", models.FirstModel)
     ModelCatalog.register_custom_model("2nd_model", models.SecondModel)
     ModelCatalog.register_custom_model("3rd_model", models.ThirdModel)
+    ModelCatalog.register_custom_model("rnd_model", models.RNDModel)
 
     # pbt = PopulationBasedTraining(
     #     time_attr="training_iteration",
@@ -146,12 +152,12 @@ def training_team():
             "env": PommeMultiAgent,
             "env_config": env_config,
             "num_workers": 8,
-            "num_envs_per_worker": 4,
+            "num_envs_per_worker": 1,
             "num_gpus": 1,
             "train_batch_size": 50000,
             "sgd_minibatch_size": 5000,
             "clip_param": 0.2,
-            "lambda": 0.995,
+            "lambda": 0.95,
             "num_sgd_iter": 10,
             "vf_share_layers": True,
             "vf_loss_coeff": 1e-3,
@@ -165,18 +171,18 @@ def training_team():
                 "policies": {
                     "ppo_policy": (PPOTFPolicy, obs_space, act_space, {
                         "model": {
-                            "custom_model": "3rd_model",
-                            "use_lstm": True,
-                            "max_seq_len": 10,
+                            "custom_model": "rnd_model",
+                            # "use_lstm": True,
+                            # "max_seq_len": 10,
                         }
                     }),
                 },
                 "policy_mapping_fn": (lambda agent_id: "ppo_policy"),
                 "policies_to_train": ["ppo_policy"],
             },
-            "custom_eval_function": evaluate,
-            "evaluation_interval": 1,
-            "evaluation_num_episodes": 100,
+            # "custom_eval_function": evaluate,
+            # "evaluation_interval": 1,
+            # "evaluation_num_episodes": 100,
             "log_level": "WARN",
         }
     )
@@ -244,6 +250,6 @@ def evaluate(trainer, eval_workers):
 
 if __name__ == "__main__":
     ray.shutdown()
-    ray.init(local_mode=False)
+    ray.init(num_gpus=1)
 
     training_team()

@@ -1,0 +1,10 @@
+{
+    "agents": "[{\"agent_id\": 0, \"is_alive\": false, \"position\": [0, 1], \"ammo\": 3, \"blast_strength\": 5, \"can_kick\": true}, {\"agent_id\": 1, \"is_alive\": false, \"position\": [9, 2], \"ammo\": 1, \"blast_strength\": 2, \"can_kick\": false}, {\"agent_id\": 2, \"is_alive\": true, \"position\": [7, 6], \"ammo\": 1, \"blast_strength\": 2, \"can_kick\": false}, {\"agent_id\": 3, \"is_alive\": true, \"position\": [1, 7], \"ammo\": 0, \"blast_strength\": 2, \"can_kick\": false}]",
+    "board": "[[0, 0, 0, 1, 0, 0, 1, 2, 2, 2, 1], [0, 0, 0, 0, 2, 2, 2, 13, 3, 0, 2], [0, 0, 0, 0, 0, 2, 1, 1, 0, 0, 2], [1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 2], [0, 2, 0, 1, 0, 0, 1, 1, 1, 2, 2], [0, 2, 2, 1, 0, 0, 2, 2, 2, 2, 1], [1, 2, 1, 1, 1, 2, 0, 0, 1, 2, 2], [2, 0, 1, 1, 1, 2, 12, 0, 0, 0, 1], [2, 0, 0, 1, 1, 2, 1, 0, 0, 4, 1], [8, 0, 0, 0, 2, 2, 2, 0, 4, 4, 1], [1, 0, 2, 2, 2, 1, 2, 1, 1, 1, 0]]",
+    "board_size": "11",
+    "bombs": "[{\"position\": [1, 8], \"bomber_id\": 3, \"life\": 1, \"blast_strength\": 2, \"moving_direction\": null}]",
+    "flames": "[{\"position\": [8, 9], \"life\": 1}, {\"position\": [9, 8], \"life\": 1}, {\"position\": [9, 9], \"life\": 1}]",
+    "intended_actions": "[0, 0, 0, 4]",
+    "items": "[[[0, 8], 7], [[2, 5], 6], [[6, 10], 6], [[6, 1], 6], [[4, 1], 8], [[8, 5], 6], [[0, 9], 8], [[1, 6], 8], [[5, 6], 7], [[1, 5], 8], [[10, 4], 6], [[4, 9], 8], [[8, 0], 7], [[5, 9], 7], [[9, 4], 6], [[5, 1], 6], [[2, 10], 8], [[10, 6], 7], [[4, 10], 8]]",
+    "step_count": "15"
+}
