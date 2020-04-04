@@ -290,5 +290,5 @@ class TestPommeEnv(unittest.TestCase):
         print(pomme_env.featurize(obs[0]))
         f0 = pomme_env.featurize(obs[0])["board"]
         for i in range(16):
-            print("i: ",i)
+            print("i:", i)
             print(f0[:, :, i])

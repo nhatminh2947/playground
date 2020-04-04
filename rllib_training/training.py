@@ -98,8 +98,9 @@ def on_episode_start(info):
 
 
 def on_postprocess_traj(info):
-    curiosity_rews = info["pre_batch"][0].model.curiosity_loss
-    info["post_batch"][1]['rewards'] += curiosity_rews
+    # curiosity_rews = info["pre_batch"][0].model.curiosity_loss
+    # info["post_batch"][1]['rewards'] += curiosity_rews
+    print(info["post_batch"])
 
 
 def training_team():
@@ -151,7 +152,7 @@ def training_team():
             "batch_mode": "complete_episodes",
             "env": PommeMultiAgent,
             "env_config": env_config,
-            "num_workers": 8,
+            "num_workers": 0,
             "num_envs_per_worker": 1,
             "num_gpus": 1,
             "train_batch_size": 50000,
@@ -165,7 +166,8 @@ def training_team():
                 "on_train_result": on_train_result,
                 "on_episode_end": on_episode_end,
                 "on_episode_step": on_episode_step,
-                "on_episode_start": on_episode_start
+                "on_episode_start": on_episode_start,
+                "on_postprocess_traj": on_postprocess_traj
             },
             "multiagent": {
                 "policies": {
