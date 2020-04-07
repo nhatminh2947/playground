@@ -7,21 +7,21 @@ from pommerman import constants
 tf = try_import_tf()
 
 
-class BaseModel(tf.keras.Model):
+class Representation(tf.keras.Model):
     def __init__(self, initializer=tf.keras.initializers.glorot_uniform, init_seed=None):
-        super(BaseModel, self).__init__(name="base")
+        super(Representation, self).__init__(name='base')
 
-        self.conv2d_32 = tf.keras.layers.Conv2D(filters=32, padding="same",
+        self.conv2d_32 = tf.keras.layers.Conv2D(filters=32, padding='same',
                                                 kernel_size=(3, 3),
                                                 kernel_initializer=initializer(seed=init_seed),
                                                 use_bias=False,
                                                 activation=tf.keras.activations.relu)
-        self.conv2d_64 = tf.keras.layers.Conv2D(filters=64, padding="same",
+        self.conv2d_64 = tf.keras.layers.Conv2D(filters=64, padding='same',
                                                 kernel_size=(3, 3),
                                                 kernel_initializer=initializer(seed=init_seed),
                                                 use_bias=False,
                                                 activation=tf.keras.activations.relu)
-        self.conv2d_128 = tf.keras.layers.Conv2D(filters=128, padding="same",
+        self.conv2d_128 = tf.keras.layers.Conv2D(filters=128, padding='same',
                                                  kernel_size=(3, 3),
                                                  kernel_initializer=initializer(seed=init_seed),
                                                  use_bias=False,
@@ -29,12 +29,12 @@ class BaseModel(tf.keras.Model):
 
         self.flatten_layer = tf.keras.layers.Flatten()
 
-        self.fc_128 = tf.keras.layers.Dense(units=128, name="fc_1",
+        self.fc_128 = tf.keras.layers.Dense(units=128, name='fc_1',
                                             kernel_initializer=initializer(seed=init_seed),
                                             use_bias=False,
                                             activation=tf.keras.activations.relu)
 
-        self.fc_64 = tf.keras.layers.Dense(units=64, name="fc_2",
+        self.fc_64 = tf.keras.layers.Dense(units=64, name='fc_2',
                                            kernel_initializer=initializer(seed=init_seed),
                                            use_bias=False,
                                            activation=tf.keras.activations.relu)
@@ -85,64 +85,93 @@ class RunningStats(object):
         self.count = batch_count + self.count
 
 
-class RNDModel(TFModelV2):
-    """Example of a custom model that just delegates to a fc-net."""
+class CNNModel(TFModelV2):
+    '''Example of a custom model that just delegates to a fc-net.'''
 
-    def __init__(self, obs_space, action_space, num_outputs, model_config,
-                 name):
-        super(RNDModel, self).__init__(obs_space, action_space, num_outputs, model_config, name)
-        self.base_model = BaseModel()
+    def __init__(self, obs_space, action_space, num_outputs, model_config, name):
+        super(CNNModel, self).__init__(obs_space, action_space, num_outputs, model_config, name)
 
-        self.board = tf.keras.layers.Input(shape=(constants.BOARD_SIZE, constants.BOARD_SIZE, 16), name="board")
-        self.output = self.base_model.call(self.board)
+        self.board = tf.keras.layers.Input(shape=(constants.BOARD_SIZE, constants.BOARD_SIZE, 16), name='board')
 
-        #
-        # self.norm_board = tf.keras.layers.BatchNormalization()(self.board)
-        #
-        # self.conv2d_1 = tf.keras.layers.Conv2D(filters=32, padding="same",
-        #                                        kernel_size=(3, 3),
-        #                                        activation=tf.keras.activations.relu)(self.norm_board)
-        # self.conv2d_2 = tf.keras.layers.Conv2D(filters=64, padding="same",
-        #                                        kernel_size=(3, 3),
-        #                                        activation=tf.keras.activations.relu)(self.conv2d_1)
-        # self.conv2d_3 = tf.keras.layers.Conv2D(filters=128, padding="same",
-        #                                        kernel_size=(3, 3),
-        #                                        activation=tf.keras.activations.relu)(self.conv2d_2)
-        #
-        # self.flatten_layer = tf.keras.layers.Flatten()(self.conv2d_3)
-        #
-        # self.fc_1 = tf.keras.layers.Dense(units=128, name="fc_1",
-        #                                   activation=tf.keras.activations.relu)(self.flatten_layer)
-        # self.fc_2 = tf.keras.layers.Dense(units=64, name="fc_2",
-        #                                   activation=tf.keras.activations.relu)(self.fc_1)
-        #
-        # self.fc_2_bn = tf.keras.layers.BatchNormalization()(self.fc_2)
+        self.features = tf.keras.Sequential([
+            tf.keras.layers.Conv2D(filters=32, padding='same', kernel_size=(3, 3), use_bias=False,
+                                   activation=tf.keras.activations.relu),
+            tf.keras.layers.Conv2D(filters=64, padding='same', kernel_size=(3, 3), use_bias=False,
+                                   activation=tf.keras.activations.relu),
+            tf.keras.layers.Conv2D(filters=128, padding='same', kernel_size=(3, 3), use_bias=False,
+                                   activation=tf.keras.activations.relu),
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dense(units=128, name='fc_1',
+                                  use_bias=False,
+                                  activation=tf.keras.activations.relu),
+            tf.keras.layers.Dense(units=64, name='fc_1',
+                                  use_bias=False,
+                                  activation=tf.keras.activations.relu)
+        ])(self.board)
 
-        self.action_layer = tf.keras.layers.Dense(units=6, name="action",
-                                                  activation=tf.keras.activations.softmax)(self.output)
-        self.value_layer = tf.keras.layers.Dense(units=1, name="value_out")(self.output)
+        self.action_layer = tf.keras.layers.Dense(units=6, name='action',
+                                                  activation=tf.keras.activations.softmax)(self.features)
 
-        self.actor_model = tf.keras.Model(self.board, [self.action_layer, self.value_layer])
+        self.critic_intrinsic = tf.keras.layers.Dense(units=1, name='intrinsic_value')(self.features)
 
-        self.register_variables(self.actor_model.variables)
+        self.critic_extrinsic = tf.keras.layers.Dense(units=1, name='extrinsic_value')(self.features)
 
-        # self.value_layer = tf.keras.layers.Dense(units=1, name="value_out")(self.fc_2_bn)
-        #
-        # self.critic_model = tf.keras.Model(self.board, self.value_layer)
-        #
-        # self.register_variables(self.critic_model.variables)
+        self.cnn_model = tf.keras.Model(self.board, [self.action_layer, self.critic_intrinsic, self.critic_extrinsic])
 
-        self.target_model = BaseModel(init_seed=2947)
+        # RND Model
+        self.target = tf.keras.Sequential([
+            tf.keras.layers.Conv2D(filters=32, padding='same', kernel_size=(3, 3), use_bias=False,
+                                   activation=tf.keras.activations.relu, trainable=False),
+            tf.keras.layers.Conv2D(filters=64, padding='same', kernel_size=(3, 3), use_bias=False,
+                                   activation=tf.keras.activations.relu, trainable=False),
+            tf.keras.layers.Conv2D(filters=128, padding='same', kernel_size=(3, 3), use_bias=False,
+                                   activation=tf.keras.activations.relu, trainable=False),
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dense(units=128, name='fc_1',
+                                  use_bias=False,
+                                  activation=tf.keras.activations.relu, trainable=False),
+            tf.keras.layers.Dense(units=64, name='fc_1',
+                                  use_bias=False,
+                                  activation=tf.keras.activations.relu, trainable=False)
+        ])
+
+        self.predictor = tf.keras.Sequential([
+            tf.keras.layers.Conv2D(filters=32, padding='same', kernel_size=(3, 3), use_bias=False,
+                                   activation=tf.keras.activations.relu),
+            tf.keras.layers.Conv2D(filters=64, padding='same', kernel_size=(3, 3), use_bias=False,
+                                   activation=tf.keras.activations.relu),
+            tf.keras.layers.Conv2D(filters=128, padding='same', kernel_size=(3, 3), use_bias=False,
+                                   activation=tf.keras.activations.relu),
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dense(units=128, name='fc_1',
+                                  use_bias=False,
+                                  activation=tf.keras.activations.relu),
+            tf.keras.layers.Dense(units=64, name='fc_1',
+                                  use_bias=False,
+                                  activation=tf.keras.activations.relu)
+        ])
+
+        self.target(inputs=self.board)
+        self.predictor(inputs=self.board)
+
+        self.register_variables(self.cnn_model.variables)
+        self.register_variables(self.target.variables)
+        self.register_variables(self.predictor.variables)
 
     def forward(self, input_dict, state, seq_lens):
         # print(input_dict)
-        obs = input_dict["obs"]
-        # print("abilities:", obs["abilities"])
-        model_out, self._value_out = self.actor_model(obs["board"])
+        obs = input_dict['obs']
+        # print('abilities:', obs['abilities'])
+        model_out, self._intrinsic_value, self._extrinsic_value = self.cnn_model(obs['board'])
 
-        # self.curiosity_loss = self.get_curiosity(obs["board"])
-        # self._value_out = self.critic_model(obs["board"])
+        # self.curiosity_loss = self.get_curiosity(obs['board'])
+        # self._value_out = self.critic_model(obs['board'])
         return model_out, state
 
     def value_function(self):
-        return tf.reshape(self._value_out, [-1])
+        return tf.reshape(self._intrinsic_value + self._extrinsic_value, [-1])
+
+    def custom_loss(self, policy_loss, loss_inputs):
+        # intrinsic_loss = tf.keras.losses.MSE(y_true=self.target(), y_pred=self.predictor())
+        print('loss_inputs:', loss_inputs['obs'])
+        return policy_loss
