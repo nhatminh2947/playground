@@ -1,8 +1,5 @@
 import ray
 from ray import tune
-from ray.rllib.agents.ppo import PPOTrainer
-from ray.rllib.agents.ppo.ppo_tf_policy import PPOTFPolicy
-from ray.rllib.evaluation.metrics import collect_episodes, summarize_episodes
 from ray.rllib.models import ModelCatalog
 from ray.rllib.utils import try_import_tf
 
@@ -10,7 +7,8 @@ import pommerman
 from pommerman import constants
 from rllib_training import models
 from rllib_training.envs import pomme_env
-from rllib_training.envs.pomme_env import PommeFFA, PommeMultiAgent
+from rllib_training.envs.pomme_env import PommeMultiAgent
+from rllib_training.policies import PPORNDTrainer, PPORNDPolicy
 
 tf = try_import_tf()
 
@@ -98,10 +96,8 @@ def on_episode_start(info):
 
 
 def on_postprocess_traj(info):
-    # curiosity_rews = info['pre_batch'][0].model.curiosity_loss
-    # info['post_batch'][1]['rewards'] += curiosity_rews
-    print(info['post_batch'])
-    print(info['pre_batch'])
+    # print('info', info)
+    return
 
 
 def training_team():
@@ -139,10 +135,10 @@ def training_team():
     # )
 
     trials = tune.run(
-        PPOTrainer,
+        PPORNDTrainer,
         name='3rd_model_no_wood_static',
         stop={
-            'training_iteration': 10050,
+            'training_iteration': 1000,
         },
         checkpoint_freq=50,
         checkpoint_at_end=True,
@@ -150,17 +146,17 @@ def training_team():
         # num_samples=1,
         # restore='/home/nhatminh2947/ray_results/3rd_model_no_wood_static/PPO_PommeMultiAgent_9d08bc9e_0_2020-03-23_14-57-51nrucciv4/checkpoint_3500/checkpoint-3500',
         config={
-            'batch_mode': 'complete_episodes',
+            'batch_mode': 'truncate_episodes',  # 'complete_episodes',
             'env': PommeMultiAgent,
             'env_config': env_config,
             'num_workers': 0,
             'num_envs_per_worker': 1,
             'num_gpus': 1,
-            'train_batch_size': 50000,
-            'sgd_minibatch_size': 5000,
+            'train_batch_size': 100,
+            'sgd_minibatch_size': 50,
             'clip_param': 0.2,
             'lambda': 0.95,
-            'num_sgd_iter': 10,
+            'num_sgd_iter': 2,
             'vf_share_layers': True,
             'vf_loss_coeff': 1e-3,
             'callbacks': {
@@ -172,11 +168,9 @@ def training_team():
             },
             'multiagent': {
                 'policies': {
-                    'ppo_policy': (PPOTFPolicy, obs_space, act_space, {
+                    'ppo_policy': (PPORNDPolicy, obs_space, act_space, {
                         'model': {
                             'custom_model': 'rnd_model',
-                            # 'use_lstm': True,
-                            # 'max_seq_len': 10,
                         }
                     }),
                 },
@@ -186,69 +180,9 @@ def training_team():
             # 'custom_eval_function': evaluate,
             # 'evaluation_interval': 1,
             # 'evaluation_num_episodes': 100,
-            'log_level': 'WARN',
+            'log_level': 'INFO',
         }
     )
-
-
-def training_ffa(env_conf):
-    tune.run(
-        PPOTrainer,
-        stop={
-            'training_iteration': 10000,
-        },
-        checkpoint_freq=10,
-        checkpoint_at_end=True,
-        config={
-            'env': PommeFFA,
-            'env_config': env_conf,
-            'model': {
-                'custom_model': 'first_model'
-            },
-            'num_workers': 10,
-            'num_gpus': 1,
-            'log_level': 'WARN',
-        }
-    )
-
-
-def evaluate(trainer, eval_workers):
-    '''Example of a custom evaluation function.
-    Arguments:
-        trainer (Trainer): trainer class to evaluate.
-        eval_workers (WorkerSet): evaluation workers.
-    Returns:
-        metrics (dict): evaluation metrics dict.
-    '''
-
-    # We configured 2 eval workers in the training config.
-    worker_1, worker_2 = eval_workers.remote_workers()
-
-    # Set different env settings for each worker. Here we use a fixed config,
-    # which also could have been computed in each worker by looking at
-    # env_config.worker_index (printed in SimpleCorridor class above).
-    worker_1.foreach_env.remote(lambda env: env.set_corridor_length(4))
-    worker_2.foreach_env.remote(lambda env: env.set_corridor_length(7))
-
-    for i in range(5):
-        print('Custom evaluation round', i)
-        # Calling .sample() runs exactly one episode per worker due to how the
-        # eval workers are configured.
-        ray.get([w.sample.remote() for w in eval_workers.remote_workers()])
-
-    # Collect the accumulated episodes on the workers, and then summarize the
-    # episode stats into a metrics dict.
-    episodes, _ = collect_episodes(remote_workers=eval_workers.remote_workers(), timeout_seconds=99999)
-    # You can compute metrics from the episodes manually, or use the
-    # convenient `summarize_episodes()` utility:
-    metrics = summarize_episodes(episodes)
-    # Note that the above two statements are the equivalent of:
-    # metrics = collect_metrics(eval_workers.local_worker(),
-    #                           eval_workers.remote_workers())
-
-    # You can also put custom values in the metrics dict.
-    metrics['foo'] = 1
-    return metrics
 
 
 if __name__ == '__main__':

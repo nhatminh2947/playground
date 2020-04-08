@@ -159,19 +159,30 @@ class CNNModel(TFModelV2):
         self.register_variables(self.predictor.variables)
 
     def forward(self, input_dict, state, seq_lens):
-        # print(input_dict)
         obs = input_dict['obs']
-        # print('abilities:', obs['abilities'])
         model_out, self._intrinsic_value, self._extrinsic_value = self.cnn_model(obs['board'])
+        print('self._intrinsic_value', tf.reshape(self._extrinsic_value, [-1]))
 
-        # self.curiosity_loss = self.get_curiosity(obs['board'])
-        # self._value_out = self.critic_model(obs['board'])
         return model_out, state
 
     def value_function(self):
-        return tf.reshape(self._intrinsic_value + self._extrinsic_value, [-1])
+        return tf.reshape(self._extrinsic_value + self._intrinsic_value, [-1])
 
-    def custom_loss(self, policy_loss, loss_inputs):
-        # intrinsic_loss = tf.keras.losses.MSE(y_true=self.target(), y_pred=self.predictor())
-        print('loss_inputs:', loss_inputs['obs'])
-        return policy_loss
+    def extrinsic_value_function(self):
+        return tf.reshape(self._extrinsic_value, [-1])
+
+    def intrinsic_value_function(self):
+        return tf.reshape(self._intrinsic_value, [-1])
+
+    def compute_intrinsic_reward(self, next_obs):
+        print('next_obs', type(next_obs))
+        print(next_obs)
+        next_obs = tf.reshape(next_obs, [-1, 11, 11, 16])
+        print(next_obs)
+        target_next_feature = self.target(next_obs)
+        predict_next_feature = self.predictor(next_obs)
+        intrinsic_reward = tf.keras.losses.mean_squared_error(target_next_feature, predict_next_feature)
+
+        print('intrinsic_reward', intrinsic_reward)
+
+        return tf.reshape(intrinsic_reward, [-1])
