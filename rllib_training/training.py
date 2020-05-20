@@ -1,11 +1,10 @@
 import ray
 from ray import tune
 from ray.rllib.agents.ppo import PPOTrainer
-from ray.rllib.agents.ppo.ppo_tf_policy import PPOTFPolicy
 from ray.rllib.agents.ppo.ppo_torch_policy import PPOTorchPolicy
 from ray.rllib.models import ModelCatalog
 from ray.rllib.utils import try_import_tf
-
+from gym import spaces
 import pommerman
 from pommerman import constants
 from rllib_training import models
@@ -105,29 +104,13 @@ def training_team():
     }
 
     env = pommerman.make(env_id, [])
-    obs_space = pomme_env.DICT_SPACE_FULL
+    obs_space = spaces.Box(low=0, high=20, shape=(16, 11, 11))
     act_space = env.action_space
 
     ModelCatalog.register_custom_model("1st_model", models.FirstModel)
     ModelCatalog.register_custom_model("2nd_model", models.SecondModel)
     ModelCatalog.register_custom_model("torch_conv", models.ConvNetModel)
     tune.register_env("PommeMultiAgent-v0", lambda x: PommeMultiAgent(env_config))
-
-    # pbt = PopulationBasedTraining(
-    #     time_attr="training_iteration",
-    #     metric="episode_reward_mean",
-    #     mode="max",
-    #     perturbation_interval=10,
-    #     resample_probability=0.25,
-    #     hyperparam_mutations={
-    #         "lambda": lambda: random.uniform(0.9, 1.0),
-    #         "clip_param": lambda: random.uniform(0.01, 0.5),
-    #         "lr": [1e-3, 5e-4, 1e-4, 5e-5, 1e-5],
-    #         "num_sgd_iter": lambda: random.randint(1, 30),
-    #         "sgd_minibatch_size": lambda: random.randint(128, 16384),
-    #         "train_batch_size": lambda: random.randint(2000, 160000),
-    #     }
-    # )
 
     def gen_policy():
         config = {
@@ -138,37 +121,36 @@ def training_team():
                     "feature_dim": 512
                 }
             },
+            "gamma": 0.999,
             "use_pytorch": True
         }
         return PPOTorchPolicy, obs_space, act_space, config
 
-    # Setup PPO with an ensemble of `num_policies` different policies.
     policies = {
         "policy_{}".format(i): gen_policy() for i in range(2)
     }
     print(policies.keys())
+
     trials = tune.run(
         PPOTrainer,
         queue_trials=True,
         stop={
-            "training_iteration": 10050,
+            "training_iteration": 10000,
         },
-        checkpoint_freq=50,
+        checkpoint_freq=10,
         checkpoint_at_end=True,
-        # scheduler=pbt,
-        # num_samples=1,
-        # restore="/home/nhatminh2947/ray_results/3rd_model_no_wood_static/PPO_PommeMultiAgent_9d08bc9e_0_2020-03-23_14-57-51nrucciv4/checkpoint_3500/checkpoint-3500",
         config={
             "batch_mode": "complete_episodes",
             "env": PommeMultiAgent,
             "env_config": env_config,
-            "num_workers": 11,
+            "num_workers": 8,
+            "num_envs_per_worker": 8,
             "num_gpus": 1,
             "train_batch_size": 50000,
             "sgd_minibatch_size": 5000,
-            "clip_param": 0.2,
-            "lambda": 0.995,
-            "num_sgd_iter": 10,
+            "clip_param": 0.5,
+            "lambda": 0.95,
+            "num_sgd_iter": 4,
             "vf_share_layers": True,
             "vf_loss_coeff": 1e-3,
             "callbacks": {
@@ -182,9 +164,6 @@ def training_team():
                 "policy_mapping_fn": (lambda agent_id: list(policies.keys())[agent_id % 2]),
                 "policies_to_train": ["policy_0", "policy_1"],
             },
-            # "custom_eval_function": evaluate,
-            # "evaluation_interval": 1,
-            # "evaluation_num_episodes": 100,
             "log_level": "WARN",
             "use_pytorch": True
         }

@@ -2,18 +2,14 @@ from abc import ABC
 
 from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
 from ray.rllib.utils import try_import_torch
-from ray.rllib.models.preprocessors import get_preprocessor
-from ray.rllib.models.model import restore_original_dimensions
 
 torch, nn = try_import_torch()
-from pommerman import constants
 
 
 class ActorCriticModel(nn.Module, TorchModelV2, ABC):
     def __init__(self, obs_space, action_space, num_outputs, model_config, name):
         TorchModelV2.__init__(self, obs_space, action_space, num_outputs, model_config, name)
         nn.Module.__init__(self)
-        self.preprocessor = get_preprocessor(obs_space.original_space)(obs_space.original_space)
 
         self.shared_layers = None
         self.actor_layers = None
@@ -22,17 +18,17 @@ class ActorCriticModel(nn.Module, TorchModelV2, ABC):
 
     def forward(self, input_dict, state, seq_lens):
         x = input_dict["obs"]
-        print(x)
+        # print('x:', x)
         x = self.shared_layers(x)
         # actor outputs
         logits = self.actor_layers(x)
 
         # compute value
         self._value_out = self.critic_layers(x)
-        return logits, None
+        return logits, state
 
     def value_function(self):
-        return self._value_out
+        return torch.reshape(self._value_out, [-1])
 
 
 class Flatten(nn.Module):

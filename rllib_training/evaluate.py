@@ -5,8 +5,6 @@ from ray.rllib.models import ModelCatalog
 from pommerman import configs
 from pommerman.agents.simple_agent import SimpleAgent
 from pommerman.envs.v0 import Pomme
-from rllib_training.envs.pomme_env import PommeFFA
-from rllib_training.models import FirstModel, ThirdModel
 
 ray.init()
 
