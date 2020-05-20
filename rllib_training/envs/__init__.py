@@ -1,1 +1,1 @@
-from .pomme_env import PommeMultiAgent, PommeFFA
+from .pomme_env import PommeMultiAgent

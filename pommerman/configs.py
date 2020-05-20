@@ -205,6 +205,26 @@ def team_v0_env():
     return locals()
 
 
+def no_wood_env():
+    """Start up a team config with the default settings."""
+    env = envs.no_wood.Pomme
+    game_type = constants.GameType.Team
+    env_entry_point = 'pommerman.envs.no_wood:Pomme'
+    env_id = 'PommeTeam-nowood-v0'
+    env_kwargs = {
+        'game_type': game_type,
+        'board_size': constants.BOARD_SIZE,
+        'num_rigid': constants.NUM_RIGID,
+        'num_wood': 0,
+        'num_items': 0,
+        'max_steps': constants.MAX_STEPS,
+        'render_fps': constants.RENDER_FPS,
+        'env': env_entry_point,
+    }
+    agent = characters.Bomber
+    return locals()
+
+
 def phase_0_team_v0_env():
     env = envs.v0.Pomme
     game_type = constants.GameType.Team

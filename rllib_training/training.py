@@ -10,7 +10,7 @@ import pommerman
 from pommerman import constants
 from rllib_training import models
 from rllib_training.envs import pomme_env
-from rllib_training.envs.pomme_env import PommeFFA, PommeMultiAgent
+from rllib_training.envs.pomme_env import PommeMultiAgent
 
 tf = try_import_tf()
 
@@ -107,6 +107,7 @@ def training_team():
     env = pommerman.make(env_id, [])
     obs_space = pomme_env.DICT_SPACE_FULL
     act_space = env.action_space
+
     ModelCatalog.register_custom_model("1st_model", models.FirstModel)
     ModelCatalog.register_custom_model("2nd_model", models.SecondModel)
     ModelCatalog.register_custom_model("torch_conv", models.ConvNetModel)
@@ -150,19 +151,26 @@ def training_team():
         PPOTrainer,
         queue_trials=True,
         stop={
-            "training_iteration": 10000,
+            "training_iteration": 10050,
         },
-        checkpoint_freq=10,
+        checkpoint_freq=50,
         checkpoint_at_end=True,
         # scheduler=pbt,
         # num_samples=1,
+        # restore="/home/nhatminh2947/ray_results/3rd_model_no_wood_static/PPO_PommeMultiAgent_9d08bc9e_0_2020-03-23_14-57-51nrucciv4/checkpoint_3500/checkpoint-3500",
         config={
             "batch_mode": "complete_episodes",
-            "env": "PommeMultiAgent-v0",
+            "env": PommeMultiAgent,
             "env_config": env_config,
             "num_workers": 11,
             "num_gpus": 1,
-            "gamma": 0.998,
+            "train_batch_size": 50000,
+            "sgd_minibatch_size": 5000,
+            "clip_param": 0.2,
+            "lambda": 0.995,
+            "num_sgd_iter": 10,
+            "vf_share_layers": True,
+            "vf_loss_coeff": 1e-3,
             "callbacks": {
                 # "on_train_result": on_train_result,
                 # "on_episode_end": on_episode_end,
@@ -174,6 +182,9 @@ def training_team():
                 "policy_mapping_fn": (lambda agent_id: list(policies.keys())[agent_id % 2]),
                 "policies_to_train": ["policy_0", "policy_1"],
             },
+            # "custom_eval_function": evaluate,
+            # "evaluation_interval": 1,
+            # "evaluation_num_episodes": 100,
             "log_level": "WARN",
             "use_pytorch": True
         }

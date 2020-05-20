@@ -1,3 +1,5 @@
+import unittest
+
 import gym
 import numpy as np
 from gym import spaces
@@ -13,15 +15,8 @@ from pommerman.envs.v0 import Pomme
 NUM_AGENTS = 4
 
 DICT_SPACE_FULL = spaces.Dict({
-    "board": spaces.Box(low=0, high=13, shape=(11, 11)),
-    "bomb_blast_strength": spaces.Box(low=0, high=13, shape=(11, 11)),
-    "bomb_life": spaces.Box(low=0, high=13, shape=(11, 11)),
-    "position": spaces.Tuple((spaces.Discrete(11), spaces.Discrete(11))),
-    "ammo": spaces.Discrete(20),
-    "can_kick": spaces.Discrete(2),
-    "blast_strength": spaces.Discrete(20),
-    "teammate": spaces.Discrete(5),
-    "enemies": spaces.Tuple((spaces.Discrete(5), spaces.Discrete(5), spaces.Discrete(5)))
+    "board": spaces.Box(low=0, high=20, shape=(11, 11, 13)),
+    "abilities": spaces.Box(low=0, high=20, shape=(3,))
 })
 
 feature_keys = ["board", "bomb_blast_strength", "bomb_life", "position", "ammo", "can_kick", "blast_strength",
@@ -43,6 +38,7 @@ class PommeMultiAgent(MultiAgentEnv):
 
         self.action_space = self.env.action_space
         self.observation_space = DICT_SPACE_FULL
+        self._agent_ids = [[0, 2], [1, 3]]
 
     def render(self):
         self.env.render()
@@ -55,8 +51,12 @@ class PommeMultiAgent(MultiAgentEnv):
             if agent_name not in action_dict.keys():
                 action_dict[agent_name] = 0
 
-        actions = [actions[0], action_dict[self.agent_names[0]],
-                   actions[2], action_dict[self.agent_names[1]]]
+        if self._position:
+            actions = [actions[0], action_dict[self.agent_names[0]],
+                       actions[2], action_dict[self.agent_names[1]]]
+        else:
+            actions = [action_dict[self.agent_names[0]], actions[1],
+                       action_dict[self.agent_names[1]], actions[3]]
 
         _obs, _reward, _done, _info = self.env.step(actions)
 
@@ -74,6 +74,17 @@ class PommeMultiAgent(MultiAgentEnv):
         self._step_count += 1
         return obs, rewards, dones, infos
 
+    def _get_infos(self, done, info):
+        if done:
+            if info["result"] == constants.Result.Win:
+                if info["winners"] == self._agent_ids[self._position]:
+                    return {"result": constants.Result.Win}
+                else:
+                    return {"result": constants.Result.Loss}
+            else:
+                return {"result": constants.Result.Tie}
+        return {"result": constants.Result.Incomplete}
+
     def _get_rewards(self, done, result):
         if done and result == constants.Result.Tie:
             return 0
@@ -84,7 +95,7 @@ class PommeMultiAgent(MultiAgentEnv):
     def featurize(self, obs):
         id = 0
         features = np.zeros(shape=(16, 11, 11))
-        # print(obs)
+
         for item in constants.Item:
             if item in [constants.Item.Bomb,
                         constants.Item.Flames,
@@ -125,12 +136,34 @@ class PommeMultiAgent(MultiAgentEnv):
 
         return features
 
+
     def reset(self):
         obs = self.env.reset()
         self._step_count = 0
+
         obs = {0: self.featurize(obs[0]),
                1: self.featurize(obs[1]),
                2: self.featurize(obs[2]),
                3: self.featurize(obs[3])}
 
         return obs
+
+
+class TestPommeEnv(unittest.TestCase):
+    def test_featurize_function(self):
+        agents_list = [agents.StaticAgent(),
+                       agents.StaticAgent(),
+                       agents.StaticAgent(),
+                       agents.StaticAgent()]
+
+        env = pommerman.make("Mines-PommeTeam-v0", agents_list)
+
+        obs = env.reset()
+
+        pomme_env = PommeMultiAgent({
+            "agent_names": [],
+            "env_id": "Mines-PommeTeam-v0",
+            "phase": 0
+        })
+
+        print(pomme_env.featurize(obs[0]))
