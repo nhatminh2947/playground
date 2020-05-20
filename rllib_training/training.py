@@ -2,6 +2,7 @@ import ray
 from ray import tune
 from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.agents.ppo.ppo_tf_policy import PPOTFPolicy
+from ray.rllib.agents.ppo.ppo_torch_policy import PPOTorchPolicy
 from ray.rllib.models import ModelCatalog
 from ray.rllib.utils import try_import_tf
 
@@ -9,43 +10,40 @@ import pommerman
 from pommerman import constants
 from rllib_training import models
 from rllib_training.envs import pomme_env
-from rllib_training.envs.pomme_env import PommeFFA
+from rllib_training.envs.pomme_env import PommeFFA, PommeMultiAgent
 
 tf = try_import_tf()
-
-# agent_names = ["simple_agent_0", "simple_agent_1", "simple_agent_2", "ppo_agent_3"]
-agent_names = ["ppo_agent_1", "ppo_agent_2"]
 
 NUM_AGENTS = 4
 
 
-def on_episode_end(info):
-    global last_info
-    episode = info["episode"]
-
-    for agent_name in agent_names:
-        if episode.last_info_for(agent_name)["result"] != constants.Result.Incomplete:
-            last_info = episode.last_info_for(agent_name)
-            break
-    # print(episode.agent_rewards)
-    # print(episode._agent_reward_history["ppo_agent_1"])
-    # print(episode._agent_reward_history["ppo_agent_2"])
-    if "win" not in episode.custom_metrics:
-        episode.custom_metrics["win"] = 0
-    if "loss" not in episode.custom_metrics:
-        episode.custom_metrics["loss"] = 0
-    if "tie" not in episode.custom_metrics:
-        episode.custom_metrics["tie"] = 0
-    # print(last_info)
-    if last_info["result"] == constants.Result.Win:
-        if any([last_info['winners'] == [1, 3],
-                last_info['winners'] == [1],
-                last_info['winners'] == [3]]):
-            episode.custom_metrics["win"] += 1
-        else:
-            episode.custom_metrics["loss"] += 1
-    elif last_info["result"] == constants.Result.Tie:
-        episode.custom_metrics["tie"] += 1
+# def on_episode_end(info):
+#     global last_info
+#     episode = info["episode"]
+#
+#     for agent_name in agent_names:
+#         if episode.last_info_for(agent_name)["result"] != constants.Result.Incomplete:
+#             last_info = episode.last_info_for(agent_name)
+#             break
+#     # print(episode.agent_rewards)
+#     # print(episode._agent_reward_history["ppo_agent_1"])
+#     # print(episode._agent_reward_history["ppo_agent_2"])
+#     if "win" not in episode.custom_metrics:
+#         episode.custom_metrics["win"] = 0
+#     if "loss" not in episode.custom_metrics:
+#         episode.custom_metrics["loss"] = 0
+#     if "tie" not in episode.custom_metrics:
+#         episode.custom_metrics["tie"] = 0
+#     # print(last_info)
+#     if last_info["result"] == constants.Result.Win:
+#         if any([last_info['winners'] == [1, 3],
+#                 last_info['winners'] == [1],
+#                 last_info['winners'] == [3]]):
+#             episode.custom_metrics["win"] += 1
+#         else:
+#             episode.custom_metrics["loss"] += 1
+#     elif last_info["result"] == constants.Result.Tie:
+#         episode.custom_metrics["tie"] += 1
 
 
 def on_train_result(info):
@@ -83,29 +81,27 @@ def on_train_result(info):
                 lambda env: env.set_phase(result["phase"])))
 
 
-def on_episode_step(info):
-    episode = info["episode"]
-
-    for agent_name in agent_names:
-        action = episode.last_action_for(agent_name)
-        if action == constants.Action.Bomb.value:
-            episode.custom_metrics[agent_name + "_bomb"] += 1
-
-
-def on_episode_start(info):
-    episode = info["episode"]
-
-    for agent_name in agent_names:
-        episode.custom_metrics[agent_name + "_bomb"] = 0
+# def on_episode_step(info):
+#     episode = info["episode"]
+#
+#     for agent_name in agent_names:
+#         action = episode.last_action_for(agent_name)
+#         if action == constants.Action.Bomb.value:
+#             episode.custom_metrics[agent_name + "_bomb"] += 1
+#
+#
+# def on_episode_start(info):
+#     episode = info["episode"]
+#
+#     for agent_name in agent_names:
+#         episode.custom_metrics[agent_name + "_bomb"] = 0
 
 
 def training_team():
-    env_id = "PommeTeam-v0"
+    env_id = "PommeTeamCompetition-v0"
 
     env_config = {
-        "agent_names": agent_names,
-        "env_id": "Mines-PommeTeam-v0",
-        "phase": 0
+        "env_id": "PommeTeamCompetition-v0"
     }
 
     env = pommerman.make(env_id, [])
@@ -113,6 +109,8 @@ def training_team():
     act_space = env.action_space
     ModelCatalog.register_custom_model("1st_model", models.FirstModel)
     ModelCatalog.register_custom_model("2nd_model", models.SecondModel)
+    ModelCatalog.register_custom_model("torch_conv", models.ConvNetModel)
+    tune.register_env("PommeMultiAgent-v0", lambda x: PommeMultiAgent(env_config))
 
     # pbt = PopulationBasedTraining(
     #     time_attr="training_iteration",
@@ -130,9 +128,27 @@ def training_team():
     #     }
     # )
 
+    def gen_policy():
+        config = {
+            "model": {
+                "custom_model": "torch_conv",
+                "custom_options": {
+                    "in_channels": 16,
+                    "feature_dim": 512
+                }
+            },
+            "use_pytorch": True
+        }
+        return PPOTorchPolicy, obs_space, act_space, config
+
+    # Setup PPO with an ensemble of `num_policies` different policies.
+    policies = {
+        "policy_{}".format(i): gen_policy() for i in range(2)
+    }
+    print(policies.keys())
     trials = tune.run(
         PPOTrainer,
-        name="1st_model_reward_shaping",
+        queue_trials=True,
         stop={
             "training_iteration": 10000,
         },
@@ -144,54 +160,28 @@ def training_team():
             "batch_mode": "complete_episodes",
             "env": "PommeMultiAgent-v0",
             "env_config": env_config,
-            "num_workers": 10,
+            "num_workers": 11,
             "num_gpus": 1,
             "gamma": 0.998,
             "callbacks": {
-                "on_train_result": on_train_result,
-                "on_episode_end": on_episode_end,
-                "on_episode_step": on_episode_step,
-                "on_episode_start": on_episode_start
+                # "on_train_result": on_train_result,
+                # "on_episode_end": on_episode_end,
+                # "on_episode_step": on_episode_step,
+                # "on_episode_start": on_episode_start
             },
             "multiagent": {
-                "policies": {
-                    "ppo_policy": (PPOTFPolicy, obs_space, act_space, {
-                        "model": {
-                            "custom_model": "1st_model"
-                        }
-                    }),
-                },
-                "policy_mapping_fn": (lambda agent_id: "ppo_policy"),
-                "policies_to_train": ["ppo_policy"],
+                "policies": policies,
+                "policy_mapping_fn": (lambda agent_id: list(policies.keys())[agent_id % 2]),
+                "policies_to_train": ["policy_0", "policy_1"],
             },
             "log_level": "WARN",
-        }
-    )
-
-
-def training_ffa(env_conf):
-    tune.run(
-        PPOTrainer,
-        stop={
-            "training_iteration": 10000,
-        },
-        checkpoint_freq=10,
-        checkpoint_at_end=True,
-        config={
-            "env": PommeFFA,
-            "env_config": env_conf,
-            "model": {
-                "custom_model": "first_model"
-            },
-            "num_workers": 10,
-            "num_gpus": 1,
-            "log_level": "WARN",
+            "use_pytorch": True
         }
     )
 
 
 if __name__ == "__main__":
     ray.shutdown()
-    ray.init(local_mode=False)
+    ray.init()
 
     training_team()

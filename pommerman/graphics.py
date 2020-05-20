@@ -9,15 +9,13 @@ import os
 from random import randint
 from time import strftime
 
-from gym.utils import reraise
 import numpy as np
 from PIL import Image
 
 try:
     import pyglet
 except ImportError as error:
-    reraise(
-        suffix="Install pyglet with 'pip install pyglet'. If you want to just "
+    raise ("Install pyglet with 'pip install pyglet'. If you want to just "
         "install all Gym dependencies, run 'pip install -e .[all]' or "
         "'pip install gym[all]'.")
 
