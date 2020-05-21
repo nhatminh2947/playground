@@ -57,9 +57,13 @@ class PommeMultiAgent(MultiAgentEnv):
         dones = {}
         # print('_done', _done)
 
+        infos = {}
+
         for id in self.alive_agents:
             obs[id] = self.featurize(_obs[id])
-            rewards[id] = self.reward_shaping(id, _obs[id], prev_obs[id]['board'])
+            rewards[id] = self.reward_shaping(id, _obs[id], prev_obs[id]['board'], _info)
+            infos[id] = _info
+
             if (id + 10) not in _obs[id]['alive']:
                 dones[id] = True
             else:
@@ -67,7 +71,6 @@ class PommeMultiAgent(MultiAgentEnv):
 
         dones["__all__"] = _done
 
-        infos = {}
         self._step_count += 1
 
         self.alive_agents = np.asarray(_obs[0]['alive']) - constants.Item.Agent0.value
@@ -77,31 +80,22 @@ class PommeMultiAgent(MultiAgentEnv):
             if i not in self.alive_agents:
                 self.eliminated.append(i)
 
-        # print('rewards', rewards)
-        # print('dones:', dones)
         return obs, rewards, dones, infos
 
-    def _get_infos(self, done, info):
-        if done:
-            if info["result"] == constants.Result.Win:
-                if info["winners"] == self._agent_ids[self._position]:
-                    return {"result": constants.Result.Win}
-                else:
-                    return {"result": constants.Result.Loss}
-            else:
-                return {"result": constants.Result.Tie}
-        return {"result": constants.Result.Incomplete}
-
-    def reward_shaping(self, agent_id, new_obs, prev_board):
+    def reward_shaping(self, agent_id, new_obs, prev_board, info):
         reward = 0
         current_alive_agents = np.asarray(new_obs['alive']) - constants.Item.Agent0.value
+
+        if info['result'] == constants.Result.Tie:
+            return -1
+
+        if agent_id not in current_alive_agents:
+            return -1
+
         if agent_id % 2 == 0:
             enemies = [1, 3]
         else:
             enemies = [0, 2]
-
-        if agent_id not in current_alive_agents:
-            return -1
 
         if utility.position_is_powerup(prev_board, new_obs['position']):
             if constants.Item(prev_board[new_obs['position']]) == constants.Item.IncrRange:

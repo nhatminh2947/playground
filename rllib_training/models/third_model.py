@@ -41,25 +41,43 @@ class ConvNetModel(ActorCriticModel):
         ActorCriticModel.__init__(self, obs_space, action_space, num_outputs, model_config, name)
 
         self.shared_layers = nn.Sequential(
-            nn.Conv2d(in_channels, 32, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=32,
+                kernel_size=3,
+                padding=1,
+                stride=1),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(
+                in_channels=32,
+                out_channels=64,
+                kernel_size=3,
+                padding=1,
+                stride=1),
             nn.ReLU(),
-            nn.Conv2d(64, 128, kernel_size=3, stride=1),
+            nn.Conv2d(
+                in_channels=64,
+                out_channels=128,
+                kernel_size=3,
+                stride=1),
             nn.ReLU(),
             Flatten(),
             nn.Linear(9 * 9 * 128, 256),
             nn.ReLU(),
             nn.Linear(256, feature_dim),
-            nn.ReLU(),
+            nn.ReLU()
         )
 
         self.actor_layers = nn.Sequential(
-            nn.Linear(in_features=feature_dim, out_features=action_space.n)
+            nn.Linear(feature_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, action_space.n)
         )
 
         self.critic_layers = nn.Sequential(
-            nn.Linear(in_features=feature_dim, out_features=1)
+            nn.Linear(feature_dim, 512),
+            nn.ReLU(),
+            nn.Linear(in_features=512, out_features=1)
         )
 
         self._value_out = None

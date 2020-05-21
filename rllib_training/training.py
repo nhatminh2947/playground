@@ -16,33 +16,31 @@ tf = try_import_tf()
 NUM_AGENTS = 4
 
 
-# def on_episode_end(info):
-#     global last_info
-#     episode = info["episode"]
-#
-#     for agent_name in agent_names:
-#         if episode.last_info_for(agent_name)["result"] != constants.Result.Incomplete:
-#             last_info = episode.last_info_for(agent_name)
-#             break
-#     # print(episode.agent_rewards)
-#     # print(episode._agent_reward_history["ppo_agent_1"])
-#     # print(episode._agent_reward_history["ppo_agent_2"])
-#     if "win" not in episode.custom_metrics:
-#         episode.custom_metrics["win"] = 0
-#     if "loss" not in episode.custom_metrics:
-#         episode.custom_metrics["loss"] = 0
-#     if "tie" not in episode.custom_metrics:
-#         episode.custom_metrics["tie"] = 0
-#     # print(last_info)
-#     if last_info["result"] == constants.Result.Win:
-#         if any([last_info['winners'] == [1, 3],
-#                 last_info['winners'] == [1],
-#                 last_info['winners'] == [3]]):
-#             episode.custom_metrics["win"] += 1
-#         else:
-#             episode.custom_metrics["loss"] += 1
-#     elif last_info["result"] == constants.Result.Tie:
-#         episode.custom_metrics["tie"] += 1
+def on_episode_end(info):
+    global last_info
+    episode = info["episode"]
+
+    for agent_name in range(4):
+        if episode.last_info_for(agent_name)["result"] != constants.Result.Incomplete:
+            last_info = episode.last_info_for(agent_name)
+            break
+    # print(episode.agent_rewards)
+    # print(episode._agent_reward_history["ppo_agent_1"])
+    # print(episode._agent_reward_history["ppo_agent_2"])
+    if "win_team_1" not in episode.custom_metrics:
+        episode.custom_metrics["win_team_1"] = 0
+    if "win_team_2" not in episode.custom_metrics:
+        episode.custom_metrics["win_team_2"] = 0
+    if "tie" not in episode.custom_metrics:
+        episode.custom_metrics["tie"] = 0
+    # print(last_info)
+    if last_info["result"] == constants.Result.Win:
+        if last_info['winners'] == [0, 2]:
+            episode.custom_metrics["win_team_1"] += 1
+        else:
+            episode.custom_metrics["win_team_2"] += 1
+    elif last_info["result"] == constants.Result.Tie:
+        episode.custom_metrics["tie"] += 1
 
 
 def on_train_result(info):
@@ -80,20 +78,20 @@ def on_train_result(info):
                 lambda env: env.set_phase(result["phase"])))
 
 
-# def on_episode_step(info):
-#     episode = info["episode"]
-#
-#     for agent_name in agent_names:
-#         action = episode.last_action_for(agent_name)
-#         if action == constants.Action.Bomb.value:
-#             episode.custom_metrics[agent_name + "_bomb"] += 1
-#
-#
-# def on_episode_start(info):
-#     episode = info["episode"]
-#
-#     for agent_name in agent_names:
-#         episode.custom_metrics[agent_name + "_bomb"] = 0
+def on_episode_step(info):
+    episode = info["episode"]
+
+    for agent_name in range(4):
+        action = episode.last_action_for(agent_name)
+        if action == constants.Action.Bomb.value:
+            episode.custom_metrics["bomb_agent_{}".format(agent_name)] += 1
+
+
+def on_episode_start(info):
+    episode = info["episode"]
+
+    for agent_name in range(4):
+        episode.custom_metrics["bomb_agent_{}".format(agent_name)] = 0
 
 
 def training_team():
@@ -121,7 +119,7 @@ def training_team():
                     "feature_dim": 512
                 }
             },
-            "gamma": 0.999,
+            "gamma": 0.995,
             "use_pytorch": True
         }
         return PPOTorchPolicy, obs_space, act_space, config
@@ -135,29 +133,33 @@ def training_team():
         PPOTrainer,
         queue_trials=True,
         stop={
-            "training_iteration": 10000,
+            "training_iteration": 1000,
+            # "timesteps_total": 100000000
         },
         checkpoint_freq=10,
         checkpoint_at_end=True,
         config={
-            "batch_mode": "complete_episodes",
+            "lr": 1e-4,
+            "entropy_coeff": 0.01,
+            "kl_coeff": 0.0,
+            "batch_mode": "truncate_episodes",
             "env": PommeMultiAgent,
             "env_config": env_config,
             "num_workers": 8,
-            "num_envs_per_worker": 8,
+            "num_envs_per_worker": 16,
             "num_gpus": 1,
-            "train_batch_size": 50000,
-            "sgd_minibatch_size": 5000,
-            "clip_param": 0.5,
+            "train_batch_size": 65536,
+            "sgd_minibatch_size": 1024,
+            "clip_param": 0.2,
             "lambda": 0.95,
-            "num_sgd_iter": 4,
+            "num_sgd_iter": 6,
             "vf_share_layers": True,
-            "vf_loss_coeff": 1e-3,
+            "vf_loss_coeff": 0.5,
             "callbacks": {
                 # "on_train_result": on_train_result,
-                # "on_episode_end": on_episode_end,
-                # "on_episode_step": on_episode_step,
-                # "on_episode_start": on_episode_start
+                "on_episode_end": on_episode_end,
+                "on_episode_step": on_episode_step,
+                "on_episode_start": on_episode_start
             },
             "multiagent": {
                 "policies": policies,
@@ -172,6 +174,6 @@ def training_team():
 
 if __name__ == "__main__":
     ray.shutdown()
-    ray.init()
+    ray.init(object_store_memory=4e10)
 
     training_team()
