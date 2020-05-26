@@ -10,6 +10,7 @@ from pommerman import constants
 from rllib_training import models
 from rllib_training.envs import pomme_env
 from rllib_training.envs.pomme_env import PommeMultiAgent
+from rllib_training.policies import RandomPolicy
 
 tf = try_import_tf()
 
@@ -94,11 +95,12 @@ def on_episode_start(info):
         episode.custom_metrics["bomb_agent_{}".format(agent_name)] = 0
 
 
-def training_team():
+def training_team(params):
     env_id = "PommeTeamCompetition-v0"
 
     env_config = {
-        "env_id": "PommeTeamCompetition-v0"
+        "env_id": "PommeTeamCompetition-v0",
+        "render": False
     }
 
     env = pommerman.make(env_id, [])
@@ -127,34 +129,37 @@ def training_team():
     policies = {
         "policy_{}".format(i): gen_policy() for i in range(2)
     }
+    policies["random"] = (RandomPolicy, obs_space, act_space, {})
     print(policies.keys())
 
     trials = tune.run(
         PPOTrainer,
+        name=params["name"],
         queue_trials=True,
         stop={
-            "training_iteration": 1000,
+            "training_iteration": params["training_iteration"],
             # "timesteps_total": 100000000
         },
-        checkpoint_freq=10,
+        checkpoint_freq=params["checkpoint_freq"],
         checkpoint_at_end=True,
         config={
-            "lr": 1e-4,
-            "entropy_coeff": 0.01,
-            "kl_coeff": 0.0,
-            "batch_mode": "truncate_episodes",
+            "lr": params["lr"],
+            "entropy_coeff": params["entropy_coeff"],
+            "kl_coeff": 0.0,  # disable KL
+            "batch_mode": "truncate_episodes" if params['truncate_episodes'] else 'complete_episodes',
+            "rollout_fragment_length": params['rollout_fragment_length'],
             "env": PommeMultiAgent,
             "env_config": env_config,
-            "num_workers": 8,
-            "num_envs_per_worker": 16,
-            "num_gpus": 1,
-            "train_batch_size": 65536,
-            "sgd_minibatch_size": 1024,
-            "clip_param": 0.2,
-            "lambda": 0.95,
-            "num_sgd_iter": 6,
+            "num_workers": params['num_workers'],
+            # "num_envs_per_worker": params['num_envs_per_worker'],
+            "num_gpus": params['num_gpus'],
+            "train_batch_size": params['train_batch_size'],
+            "sgd_minibatch_size": params['sgd_minibatch_size'],
+            "clip_param": params['clip_param'],
+            "lambda": params['lambda'],
+            "num_sgd_iter": params['num_sgd_iter'],
             "vf_share_layers": True,
-            "vf_loss_coeff": 0.5,
+            "vf_loss_coeff": params['vf_loss_coeff'],
             "callbacks": {
                 # "on_train_result": on_train_result,
                 "on_episode_end": on_episode_end,
@@ -163,8 +168,8 @@ def training_team():
             },
             "multiagent": {
                 "policies": policies,
-                "policy_mapping_fn": (lambda agent_id: list(policies.keys())[agent_id % 2]),
-                "policies_to_train": ["policy_0", "policy_1"],
+                "policy_mapping_fn": (lambda agent_id: "policy_0" if agent_id == 0 else "random"),
+                "policies_to_train": ["policy_0"],
             },
             "log_level": "WARN",
             "use_pytorch": True
@@ -176,4 +181,29 @@ if __name__ == "__main__":
     ray.shutdown()
     ray.init(object_store_memory=4e10)
 
-    training_team()
+    import argparse
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--num_workers', type=int, default=0, help='number of worker')
+    parser.add_argument('--num_gpus', type=int, default=1, help='number of gpu')
+    parser.add_argument('--train_batch_size', type=int, default=65536)
+    parser.add_argument('--sgd_minibatch_size', type=int, default=1024)
+    parser.add_argument('--clip_param', type=float, default=0.2)
+    parser.add_argument('--lambda', type=float, default=0.95)
+    parser.add_argument('--gamma', type=float, default=0.995)
+    parser.add_argument('--num_sgd_iter', type=int, default=3)
+    parser.add_argument('--vf_loss_coeff', type=float, default=0.5)
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--entropy_coeff', type=float, default=0.01)
+    parser.add_argument('--truncate_episodes', type=bool, default=True,
+                        help='if True use truncate_episodes else complete_episodes')
+    parser.add_argument('--rollout_fragment_length', type=int, default=256)
+    parser.add_argument('--training_iteration', type=int, default=1000)
+    parser.add_argument('--checkpoint_freq', type=int, default=10)
+    parser.add_argument('--num_envs_per_worker', type=int, default=1)
+    parser.add_argument('--name', type=str, default="experiment")
+
+    args = parser.parse_args()
+    params = vars(args)
+
+    training_team(params)
