@@ -95,10 +95,10 @@ class PommeMultiAgent(MultiAgentEnv):
                 for channel in range(16):
                     if channel < 9:
                         self.fow[i][channel][obs[i][channel] != 0] = obs[i][channel][obs[i][channel] != 0]
-                        print(self.fow[i][channel])
+                        # print(self.fow[i][channel])
                     else:
                         self.fow[i][channel] = obs[i][channel]
-                        print(self.fow[i][channel])
+                        # print(self.fow[i][channel])
             else:
                 self.fow.pop(i, None)
 
