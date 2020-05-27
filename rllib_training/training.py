@@ -20,9 +20,8 @@ from typing import Dict
 
 
 class PommeCallbacks(DefaultCallbacks):
-    def on_episode_end(self, worker: RolloutWorker, base_env: BaseEnv,
-                       policies: Dict[str, Policy], episode: MultiAgentEpisode,
-                       **kwargs):
+    def on_episode_end(self, worker: RolloutWorker, base_env: BaseEnv, policies: Dict[str, Policy],
+                       episode: MultiAgentEpisode, **kwargs):
         last_info = None
 
         for agent_name in range(4):
@@ -47,20 +46,16 @@ class PommeCallbacks(DefaultCallbacks):
         elif last_info["result"] == constants.Result.Tie:
             episode.custom_metrics["tie"] += 1
 
-    def on_episode_end(self, worker: RolloutWorker, base_env: BaseEnv,
-                       policies: Dict[str, Policy], episode: MultiAgentEpisode,
-                       **kwargs):
+    def on_episode_step(self, worker: RolloutWorker, base_env: BaseEnv, episode: MultiAgentEpisode, **kwargs):
         for agent_name in range(4):
             action = episode.last_action_for(agent_name)
             if action == constants.Action.Bomb.value:
                 episode.custom_metrics["bomb_agent_{}".format(agent_name)] += 1
 
-    def on_episode_start(self, worker: RolloutWorker, base_env: BaseEnv,
-                         policies: Dict[str, Policy],
+    def on_episode_start(self, worker: RolloutWorker, base_env: BaseEnv, policies: Dict[str, Policy],
                          episode: MultiAgentEpisode, **kwargs):
         for agent_name in range(4):
             episode.custom_metrics["bomb_agent_{}".format(agent_name)] = 0
-            episode.custom_metrics["reward_agent_{}".format(agent_name)] = 0
 
 
 def training_team(params):
@@ -105,6 +100,7 @@ def training_team(params):
 
     trials = tune.run(
         PPOTrainer,
+        restore=params["restore"],
         name=params["name"],
         queue_trials=True,
         stop={
@@ -171,6 +167,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_gpus_per_worker', type=float, default=0.0)
     parser.add_argument('--name', type=str, default="experiment")
     parser.add_argument('--render', type=bool, default=False)
+    parser.add_argument('--restore', type=str, default=None)
 
     args = parser.parse_args()
     params = vars(args)

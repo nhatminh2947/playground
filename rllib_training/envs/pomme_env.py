@@ -95,10 +95,10 @@ class PommeMultiAgent(MultiAgentEnv):
                 for channel in range(16):
                     if channel < 9:
                         self.fow[i][channel][obs[i][channel] != 0] = obs[i][channel][obs[i][channel] != 0]
-                        print(self.fow[i][channel])
+                        # print(self.fow[i][channel])
                     else:
                         self.fow[i][channel] = obs[i][channel]
-                        print(self.fow[i][channel])
+                        # print(self.fow[i][channel])
             else:
                 self.fow.pop(i, None)
 
@@ -152,7 +152,8 @@ class PommeMultiAgent(MultiAgentEnv):
     # 13 Ammo
     # 14 BlastStrength
     # 15 CanKick
-    def featurize(self, obs):
+    @staticmethod
+    def featurize(obs):
         id = 0
         features = np.zeros(shape=(16, 11, 11))
         # print(obs['board'])
