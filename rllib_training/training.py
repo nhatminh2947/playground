@@ -98,6 +98,13 @@ def training_team(params):
     policies["random"] = (RandomPolicy, obs_space, act_space, {})
     print(policies.keys())
 
+    def policy_mapping(agent_id):
+        if agent_id == 0:
+            return "policy_0"
+        elif agent_id == 2:
+            return "policy_1"
+        return "random"
+
     trials = tune.run(
         PPOTrainer,
         restore=params["restore"],
@@ -131,8 +138,8 @@ def training_team(params):
             "callbacks": PommeCallbacks,
             "multiagent": {
                 "policies": policies,
-                "policy_mapping_fn": (lambda agent_id: "policy_0" if agent_id % 2 == 0 else "random"),
-                "policies_to_train": ["policy_0"],
+                "policy_mapping_fn": policy_mapping,
+                "policies_to_train": ["policy_0", "policy_1"],
             },
             "log_level": "WARN",
             "use_pytorch": True
